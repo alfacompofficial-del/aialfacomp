@@ -288,26 +288,48 @@ export default function Chat() {
     }
   };
 
+  const closeSidebarOnMobile = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
+  };
+
   return (
-    <div className="h-screen flex bg-background">
+    <div className="h-[100dvh] flex bg-background overflow-hidden">
+      {/* Mobile backdrop */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside
-            initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
+            initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
             transition={{ type: "spring", damping: 25 }}
-            className="w-72 shrink-0 border-r border-sidebar-border bg-sidebar flex flex-col"
+            className="fixed md:static inset-y-0 left-0 z-40 w-[85vw] max-w-[300px] md:w-72 shrink-0 border-r border-sidebar-border bg-sidebar flex flex-col"
           >
             <div className="p-4 flex items-center gap-2 border-b border-sidebar-border">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                    style={{ background: "var(--gradient-primary)" }}>
                 <Sparkles className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-bold gradient-text text-lg">Nexus</span>
+              <span className="font-bold gradient-text text-lg flex-1">Nexus</span>
+              <Button
+                variant="ghost" size="sm" className="md:hidden"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Закрыть меню"
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
 
             <div className="p-3">
-              <Button onClick={newChat} className="w-full gap-2">
+              <Button onClick={() => { newChat(); closeSidebarOnMobile(); }} className="w-full gap-2">
                 <Plus className="w-4 h-4" /> Новый чат
               </Button>
             </div>
@@ -325,13 +347,13 @@ export default function Chat() {
                     className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
                       activeId === c.id ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"
                     }`}
-                    onClick={() => setActiveId(c.id)}
+                    onClick={() => { setActiveId(c.id); closeSidebarOnMobile(); }}
                   >
                     <MessageSquare className="w-4 h-4 shrink-0 text-muted-foreground" />
                     <span className="text-sm truncate flex-1">{c.title}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                      className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
                       aria-label="Удалить чат"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
