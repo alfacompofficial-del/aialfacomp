@@ -32,7 +32,9 @@ export default function Chat() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [toolsUsed, setToolsUsed] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 768 : true
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
