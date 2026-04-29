@@ -108,26 +108,50 @@ async function execTool(name: string, args: any): Promise<string> {
 }
 
 async function webSearch(query: string): Promise<string> {
-  const key = Deno.env.get('PERPLEXITY_API_KEY');
-  if (!key) {
-    return 'Веб-поиск временно недоступен (нужен ключ Perplexity API). Отвечу на основе своих знаний.';
+  // Free web search via DuckDuckGo Instant Answer + HTML results parsing
+  try {
+    // 1) Instant Answer API (бесплатно, без ключа)
+    const iaResp = await fetch(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`
+    );
+    let summary = '';
+    if (iaResp.ok) {
+      const ia = await iaResp.json();
+      if (ia.AbstractText) summary = `${ia.Heading ? ia.Heading + '\n' : ''}${ia.AbstractText}\n${ia.AbstractURL || ''}`;
+      else if (ia.RelatedTopics?.length) {
+        summary = ia.RelatedTopics.slice(0, 3)
+          .map((t: any) => t.Text ? `- ${t.Text} ${t.FirstURL || ''}` : '')
+          .filter(Boolean)
+          .join('\n');
+      }
+    }
+
+    // 2) HTML результаты для ссылок-источников
+    const htmlResp = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 NexusBot' },
+    });
+    const links: string[] = [];
+    if (htmlResp.ok) {
+      const html = await htmlResp.text();
+      const re = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html)) !== null && links.length < 5) {
+        let url = m[1];
+        // DDG обёртка /l/?uddg=...
+        const uddg = url.match(/uddg=([^&]+)/);
+        if (uddg) url = decodeURIComponent(uddg[1]);
+        const title = m[2].replace(/<[^>]+>/g, '').trim();
+        links.push(`- ${title}\n  ${url}`);
+      }
+    }
+
+    const parts: string[] = [];
+    if (summary) parts.push(summary);
+    if (links.length) parts.push(`Источники:\n${links.join('\n')}`);
+    return parts.length ? parts.join('\n\n') : `По запросу "${query}" ничего не найдено.`;
+  } catch (e) {
+    return `Не удалось выполнить веб-поиск: ${e instanceof Error ? e.message : 'ошибка'}`;
   }
-  const r = await fetch('https://api.perplexity.ai/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'sonar',
-      messages: [
-        { role: 'system', content: 'Be precise and concise. Cite sources.' },
-        { role: 'user', content: query },
-      ],
-    }),
-  });
-  if (!r.ok) return `Ошибка веб-поиска: ${r.status}`;
-  const data = await r.json();
-  const content = data.choices?.[0]?.message?.content || '';
-  const cites = (data.citations || []).slice(0, 5).join('\n');
-  return `${content}\n\nИсточники:\n${cites}`;
 }
 
 async function wikipediaLookup(query: string, lang: string): Promise<string> {
