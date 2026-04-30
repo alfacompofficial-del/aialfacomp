@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Plus, Trash2, LogOut, Paperclip, X, Loader2,
-  MessageSquare, Image as ImageIcon, FileText, Wrench,
+  MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 type Conversation = { id: string; title: string; updated_at: string };
 type Attachment = { name: string; type: string; url: string; data_url?: string };
@@ -378,8 +379,18 @@ export default function Chat() {
               </div>
             </ScrollArea>
 
-            <div className="p-3 border-t border-sidebar-border">
-              <Button variant="ghost" className="w-full justify-start gap-2" onClick={signOut}>
+            <div className="p-3 border-t border-sidebar-border space-y-1">
+              <Link to="/download">
+                <Button variant="ghost" className="w-full justify-start gap-2" size="sm">
+                  <Download className="w-4 h-4" /> Скачать приложение
+                </Button>
+              </Link>
+              <Link to="/developers">
+                <Button variant="ghost" className="w-full justify-start gap-2" size="sm">
+                  <Code2 className="w-4 h-4" /> API для разработчиков
+                </Button>
+              </Link>
+              <Button variant="ghost" className="w-full justify-start gap-2" size="sm" onClick={signOut}>
                 <LogOut className="w-4 h-4" /> Выйти
               </Button>
             </div>
