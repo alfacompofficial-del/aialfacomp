@@ -450,8 +450,9 @@ export default function Chat() {
               </Button>
 
               <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                ref={textareaRef}
+                defaultValue=""
+                onInput={autosize}
                 onKeyDown={onKeyDown}
                 placeholder="Спросите что угодно... (Shift+Enter — новая строка)"
                 rows={1}
@@ -461,7 +462,7 @@ export default function Chat() {
 
               <Button
                 size="sm" onClick={send}
-                disabled={streaming || (!input.trim() && pendingFiles.length === 0)}
+                disabled={streaming}
                 className="rounded-xl"
                 style={{ background: "var(--gradient-primary)" }}
               >
