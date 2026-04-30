@@ -28,7 +28,6 @@ export default function Chat() {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [toolsUsed, setToolsUsed] = useState(0);
@@ -37,6 +36,21 @@ export default function Chat() {
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const getInputValue = () => textareaRef.current?.value ?? "";
+  const setInputValue = (v: string) => {
+    if (textareaRef.current) {
+      textareaRef.current.value = v;
+      autosize();
+    }
+  };
+  const autosize = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  };
 
   // Auth guard
   useEffect(() => {
