@@ -10,14 +10,37 @@ interface Props {
   code: string;
 }
 
-const PREVIEWABLE = new Set(["html", "htm"]);
+const HTML_LANGS = new Set(["html", "htm", "xhtml"]);
+const CSS_LANGS = new Set(["css", "scss", "sass", "less"]);
+const JS_LANGS = new Set(["js", "javascript", "jsx", "ts", "typescript", "tsx"]);
+
+function buildPreviewDoc(lang: string, code: string): string {
+  // Already a full HTML doc
+  if (/<!doctype html|<html[\s>]/i.test(code)) return code;
+
+  if (HTML_LANGS.has(lang) || /<\/?[a-z][\s\S]*>/i.test(code)) {
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:16px;color:#111}</style></head><body>${code}</body></html>`;
+  }
+  if (CSS_LANGS.has(lang)) {
+    return `<!doctype html><html><head><meta charset="utf-8"><style>${code}</style></head><body><h1>Заголовок</h1><p>Пример текста для превью CSS.</p><button>Кнопка</button></body></html>`;
+  }
+  if (JS_LANGS.has(lang)) {
+    return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;margin:16px;color:#111}#out{white-space:pre-wrap;background:#f5f5f5;padding:8px;border-radius:6px;margin-top:8px}</style></head><body><div id="app"></div><div id="out"></div><script>(function(){const o=document.getElementById('out');const orig=console.log;console.log=function(...a){orig.apply(console,a);o.textContent+=a.map(x=>typeof x==='object'?JSON.stringify(x):String(x)).join(' ')+'\\n';};window.addEventListener('error',e=>{o.textContent+='Error: '+e.message+'\\n'});})();<\/script><script>${code}<\/script></body></html>`;
+  }
+  return code;
+}
 
 export function CodeBlock({ language, code }: Props) {
   const [copied, setCopied] = useState(false);
   const [previewing, setPreviewing] = useState(false);
 
   const lang = (language || "").toLowerCase().replace(/^language-/, "");
-  const isPreviewable = PREVIEWABLE.has(lang) || /<html[\s>]/i.test(code) || (lang === "" && /<\/?[a-z][\s\S]*>/i.test(code) && code.includes("</"));
+  const isPreviewable =
+    HTML_LANGS.has(lang) ||
+    CSS_LANGS.has(lang) ||
+    JS_LANGS.has(lang) ||
+    /<!doctype html|<html[\s>]/i.test(code) ||
+    (/<\/?[a-z][\s\S]*>/i.test(code) && /<\/[a-z]/i.test(code));
 
   const onCopy = async () => {
     await navigator.clipboard.writeText(code);
