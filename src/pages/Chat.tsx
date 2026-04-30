@@ -407,7 +407,7 @@ export default function Chat() {
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <EmptyState onPick={(p) => setInput(p)} />
+            <EmptyState onPick={(p) => { setInputValue(p); textareaRef.current?.focus(); }} />
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
               {messages.map((m) => (
