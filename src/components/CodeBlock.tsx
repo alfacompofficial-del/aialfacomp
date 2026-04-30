@@ -49,7 +49,7 @@ export function CodeBlock({ language, code }: Props) {
   };
 
   return (
-    <div className="my-3 rounded-xl border border-border overflow-hidden bg-[#0d1117]">
+    <div className="my-3 rounded-xl border border-border overflow-hidden bg-card">
       <div className="flex items-center justify-between px-4 py-2 bg-secondary/60 border-b border-border">
         <span className="text-xs font-mono text-muted-foreground">{lang || "text"}</span>
         <div className="flex items-center gap-1">
@@ -70,14 +70,6 @@ export function CodeBlock({ language, code }: Props) {
           </Button>
         </div>
       </div>
-      <SyntaxHighlighter
-        language={lang || "text"}
-        style={oneDark as any}
-        customStyle={{ margin: 0, padding: "16px", background: "transparent", fontSize: 13 }}
-        wrapLongLines
-      >
-        {code.replace(/\n$/, "")}
-      </SyntaxHighlighter>
 
       <AnimatePresence>
         {previewing && (
@@ -85,17 +77,28 @@ export function CodeBlock({ language, code }: Props) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="border-t border-border bg-white"
+            className="bg-background"
           >
             <iframe
               title="HTML preview"
               srcDoc={buildPreviewDoc(lang, code)}
               sandbox="allow-scripts allow-modals allow-forms"
-              className="w-full h-[400px] block bg-white"
+              className="w-full h-[min(70vh,640px)] min-h-[360px] block bg-background"
             />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!previewing && (
+        <SyntaxHighlighter
+          language={lang || "text"}
+          style={oneDark as any}
+          customStyle={{ margin: 0, padding: "16px", background: "transparent", fontSize: 13 }}
+          wrapLongLines
+        >
+          {code.replace(/\n$/, "")}
+        </SyntaxHighlighter>
+      )}
     </div>
   );
 }
