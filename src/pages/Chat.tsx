@@ -156,13 +156,14 @@ export default function Chat() {
   };
 
   const send = async () => {
-    if (!input.trim() && pendingFiles.length === 0) return;
+    const currentInput = getInputValue();
+    if (!currentInput.trim() && pendingFiles.length === 0) return;
     if (!userId) return;
     let convoId = activeId;
     if (!convoId) {
       const { data, error } = await supabase
         .from("conversations")
-        .insert({ user_id: userId, title: input.slice(0, 50) || "Новый чат" })
+        .insert({ user_id: userId, title: currentInput.slice(0, 50) || "Новый чат" })
         .select().single();
       if (error) return toast.error(error.message);
       convoId = data!.id;
@@ -172,9 +173,9 @@ export default function Chat() {
 
     setStreaming(true);
     setToolsUsed(0);
-    const text = input;
+    const text = currentInput;
     const files = pendingFiles;
-    setInput("");
+    setInputValue("");
     setPendingFiles([]);
 
     let attachments: Attachment[] = [];
