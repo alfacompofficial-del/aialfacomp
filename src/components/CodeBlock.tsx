@@ -89,7 +89,7 @@ export function CodeBlock({ language, code }: Props) {
           >
             <iframe
               title="HTML preview"
-              srcDoc={code}
+              srcDoc={buildPreviewDoc(lang, code)}
               sandbox="allow-scripts allow-modals allow-forms"
               className="w-full h-[400px] block bg-white"
             />
