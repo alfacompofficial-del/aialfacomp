@@ -28,7 +28,6 @@ export default function Chat() {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [toolsUsed, setToolsUsed] = useState(0);
@@ -37,6 +36,21 @@ export default function Chat() {
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const getInputValue = () => textareaRef.current?.value ?? "";
+  const setInputValue = (v: string) => {
+    if (textareaRef.current) {
+      textareaRef.current.value = v;
+      autosize();
+    }
+  };
+  const autosize = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  };
 
   // Auth guard
   useEffect(() => {
@@ -142,13 +156,14 @@ export default function Chat() {
   };
 
   const send = async () => {
-    if (!input.trim() && pendingFiles.length === 0) return;
+    const currentInput = getInputValue();
+    if (!currentInput.trim() && pendingFiles.length === 0) return;
     if (!userId) return;
     let convoId = activeId;
     if (!convoId) {
       const { data, error } = await supabase
         .from("conversations")
-        .insert({ user_id: userId, title: input.slice(0, 50) || "Новый чат" })
+        .insert({ user_id: userId, title: currentInput.slice(0, 50) || "Новый чат" })
         .select().single();
       if (error) return toast.error(error.message);
       convoId = data!.id;
@@ -158,9 +173,9 @@ export default function Chat() {
 
     setStreaming(true);
     setToolsUsed(0);
-    const text = input;
+    const text = currentInput;
     const files = pendingFiles;
-    setInput("");
+    setInputValue("");
     setPendingFiles([]);
 
     let attachments: Attachment[] = [];
@@ -392,7 +407,7 @@ export default function Chat() {
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <EmptyState onPick={(p) => setInput(p)} />
+            <EmptyState onPick={(p) => { setInputValue(p); textareaRef.current?.focus(); }} />
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
               {messages.map((m) => (
@@ -435,8 +450,9 @@ export default function Chat() {
               </Button>
 
               <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                ref={textareaRef}
+                defaultValue=""
+                onInput={autosize}
                 onKeyDown={onKeyDown}
                 placeholder="Спросите что угодно... (Shift+Enter — новая строка)"
                 rows={1}
@@ -446,7 +462,7 @@ export default function Chat() {
 
               <Button
                 size="sm" onClick={send}
-                disabled={streaming || (!input.trim() && pendingFiles.length === 0)}
+                disabled={streaming}
                 className="rounded-xl"
                 style={{ background: "var(--gradient-primary)" }}
               >
