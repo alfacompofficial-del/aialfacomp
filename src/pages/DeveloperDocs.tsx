@@ -45,7 +45,7 @@ export default function DeveloperDocs() {
 
         <section>
           <h2 className="text-2xl font-bold mb-3">Пример: cURL</h2>
-          <CodeBlock lang="bash" code={`curl -N "${API_URL}" \\
+          <CodeBlock language="bash" code={`curl -N "${API_URL}" \\
   -H "Authorization: Bearer nx_live_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -57,7 +57,7 @@ export default function DeveloperDocs() {
 
         <section>
           <h2 className="text-2xl font-bold mb-3">Пример: JavaScript</h2>
-          <CodeBlock lang="javascript" code={`const res = await fetch("${API_URL}", {
+          <CodeBlock language="javascript" code={`const res = await fetch("${API_URL}", {
   method: "POST",
   headers: {
     "Authorization": "Bearer nx_live_YOUR_KEY",
@@ -82,7 +82,7 @@ while (true) {
 
         <section>
           <h2 className="text-2xl font-bold mb-3">Пример: Python</h2>
-          <CodeBlock lang="python" code={`import requests, json
+          <CodeBlock language="python" code={`import requests, json
 
 resp = requests.post(
     "${API_URL}",
