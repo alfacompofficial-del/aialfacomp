@@ -1,0 +1,2 @@
+UPDATE storage.objects SET bucket_id = 'downloads', name = 'Nexus.apk' WHERE bucket_id = 'apps' AND name = 'app-debug.apk';
+UPDATE storage.objects SET bucket_id = 'downloads', name = 'Nexus-win-x64.exe' WHERE bucket_id = 'apps' AND name = 'Code Alfacomp.exe';
