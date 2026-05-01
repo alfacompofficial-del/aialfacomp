@@ -12,13 +12,13 @@ type Build = { name: string; url: string; size?: string; available: boolean };
 
 const builds: Record<"win" | "android", Build> = {
   win: {
-    name: "Nexus-win-x64.exe",
-    url: `${PUBLIC_BUCKET}/Nexus-win-x64.exe`,
+    name: "AI Alfa Comp 0.0.0.exe",
+    url: `${PUBLIC_BUCKET}/${encodeURIComponent("AI Alfa Comp 0.0.0.exe")}`,
     available: false,
   },
   android: {
-    name: "Nexus.apk",
-    url: `${PUBLIC_BUCKET}/Nexus.apk`,
+    name: "app-debug.apk",
+    url: `${PUBLIC_BUCKET}/app-debug.apk`,
     available: false,
   },
 };
