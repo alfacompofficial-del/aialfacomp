@@ -304,6 +304,33 @@ export default function Chat() {
     }
   };
 
+  const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === "file") {
+        const f = item.getAsFile();
+        if (f && f.type.startsWith("image/")) {
+          const ext = f.type.split("/")[1] || "png";
+          const named = new File(
+            [f],
+            f.name && f.name !== "image.png"
+              ? f.name
+              : `pasted-${Date.now()}.${ext}`,
+            { type: f.type }
+          );
+          files.push(named);
+        }
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      setPendingFiles((p) => [...p, ...files].slice(0, 5));
+      toast.success(`Вставлено изображений: ${files.length}`);
+    }
+  };
+
   const closeSidebarOnMobile = () => {
     if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
   };
@@ -465,7 +492,8 @@ export default function Chat() {
                 defaultValue=""
                 onInput={autosize}
                 onKeyDown={onKeyDown}
-                placeholder="Спросите что угодно... (Shift+Enter — новая строка)"
+                onPaste={onPaste}
+                placeholder="Спросите что угодно... (Shift+Enter — новая строка, Ctrl+V — вставить картинку)"
                 rows={1}
                 disabled={streaming}
                 className="flex-1 min-h-[40px] max-h-[200px] resize-none border-0 bg-transparent focus-visible:ring-0 px-2"
