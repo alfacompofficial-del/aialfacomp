@@ -304,6 +304,33 @@ export default function Chat() {
     }
   };
 
+  const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === "file") {
+        const f = item.getAsFile();
+        if (f && f.type.startsWith("image/")) {
+          const ext = f.type.split("/")[1] || "png";
+          const named = new File(
+            [f],
+            f.name && f.name !== "image.png"
+              ? f.name
+              : `pasted-${Date.now()}.${ext}`,
+            { type: f.type }
+          );
+          files.push(named);
+        }
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      setPendingFiles((p) => [...p, ...files].slice(0, 5));
+      toast.success(`Вставлено изображений: ${files.length}`);
+    }
+  };
+
   const closeSidebarOnMobile = () => {
     if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
   };
