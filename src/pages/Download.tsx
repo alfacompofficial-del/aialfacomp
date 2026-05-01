@@ -12,8 +12,8 @@ type Build = { name: string; url: string; size?: string; available: boolean };
 
 const builds: Record<"win" | "android", Build> = {
   win: {
-    name: "Nexus-win-x64.zip",
-    url: `${PUBLIC_BUCKET}/Nexus-win-x64.zip`,
+    name: "Nexus-win-x64.exe",
+    url: `${PUBLIC_BUCKET}/Nexus-win-x64.exe`,
     available: false,
   },
   android: {
@@ -90,7 +90,7 @@ export default function Download() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mb-6 flex-1">
-                Распакуйте архив и запустите <code className="px-1.5 py-0.5 bg-muted rounded">Nexus.exe</code>.
+                Скачайте и запустите <code className="px-1.5 py-0.5 bg-muted rounded">Nexus-win-x64.exe</code>.
                 Установка не требуется.
               </p>
               <Button
@@ -100,7 +100,7 @@ export default function Download() {
                 className="w-full"
               >
                 <DownloadIcon className="mr-2 h-4 w-4" />
-                {status.win ? "Скачать .zip" : "Скоро"}
+                {status.win ? "Скачать .exe" : "Скоро"}
               </Button>
               {!status.win && (
                 <p className="text-xs text-muted-foreground mt-3 text-center">
