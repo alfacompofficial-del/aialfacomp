@@ -34,19 +34,15 @@ export default function Download() {
     ]).then(([win, android]) => setStatus({ win, android }));
   }, []);
 
-  const downloadFile = async (b: Build) => {
-    try {
-      const res = await fetch(b.url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = b.name;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (e) {
-      alert("Файл ещё не загружен. Попробуйте позже.");
-    }
+  const downloadFile = (b: Build) => {
+    // Direct navigation — браузер сам скачает файл
+    const a = document.createElement("a");
+    a.href = b.url;
+    a.download = b.name;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   return (
