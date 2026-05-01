@@ -1,1 +1,3 @@
 project_id = "yebhpelgeahazxrsbaiz"
+[functions.copy-apps-to-downloads]
+verify_jwt = false
