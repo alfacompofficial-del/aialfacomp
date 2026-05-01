@@ -492,7 +492,8 @@ export default function Chat() {
                 defaultValue=""
                 onInput={autosize}
                 onKeyDown={onKeyDown}
-                placeholder="Спросите что угодно... (Shift+Enter — новая строка)"
+                onPaste={onPaste}
+                placeholder="Спросите что угодно... (Shift+Enter — новая строка, Ctrl+V — вставить картинку)"
                 rows={1}
                 disabled={streaming}
                 className="flex-1 min-h-[40px] max-h-[200px] resize-none border-0 bg-transparent focus-visible:ring-0 px-2"
