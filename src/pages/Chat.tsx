@@ -575,6 +575,15 @@ export default function Chat() {
               >
                 <Paperclip className="w-4 h-4" />
               </Button>
+              <Button
+                variant="ghost" size="sm"
+                onClick={generateImage}
+                disabled={streaming}
+                aria-label="Сгенерировать изображение"
+                title="Сгенерировать изображение (2/день бесплатно)"
+              >
+                <Wand2 className="w-4 h-4" />
+              </Button>
 
               <Textarea
                 ref={textareaRef}
@@ -582,7 +591,7 @@ export default function Chat() {
                 onInput={autosize}
                 onKeyDown={onKeyDown}
                 onPaste={onPaste}
-                placeholder="Спросите что угодно... (Shift+Enter — новая строка, Ctrl+V — вставить картинку)"
+                placeholder="Сообщение или /image <описание> для генерации картинки (2/день)"
                 rows={1}
                 disabled={streaming}
                 className="flex-1 min-h-[40px] max-h-[200px] resize-none border-0 bg-transparent focus-visible:ring-0 px-2"
