@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Plus, Trash2, LogOut, Paperclip, X, Loader2,
-  MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2,
+  MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2, Wand2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
