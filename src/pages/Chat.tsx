@@ -387,7 +387,9 @@ export default function Chat() {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      send();
+      const v = getInputValue().trim();
+      if (/^\/(image|img|gen)\b/i.test(v)) generateImage();
+      else send();
     }
   };
 
