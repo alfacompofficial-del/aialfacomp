@@ -297,6 +297,93 @@ export default function Chat() {
     }
   };
 
+  const generateImage = async () => {
+    const prompt = getInputValue().replace(/^\/(image|img|gen)\s*/i, "").trim();
+    if (!prompt) {
+      toast.error("Опишите, что нарисовать");
+      return;
+    }
+    if (!userId) return;
+
+    let convoId = activeId;
+    if (!convoId) {
+      const { data, error } = await supabase
+        .from("conversations")
+        .insert({ user_id: userId, title: "🎨 " + prompt.slice(0, 40) })
+        .select().single();
+      if (error) return toast.error(error.message);
+      convoId = data!.id;
+      setActiveId(convoId);
+      setConvos((c) => [data as any, ...c]);
+    }
+
+    setStreaming(true);
+    setInputValue("");
+
+    const userMsg: Message = {
+      id: crypto.randomUUID(), role: "user",
+      content: `🎨 Генерация: ${prompt}`, attachments: [],
+    };
+    setMessages((m) => [...m, userMsg, { id: "pending", role: "assistant", content: "Генерирую изображение...", pending: true }]);
+
+    await supabase.from("messages").insert({
+      conversation_id: convoId, user_id: userId, role: "user",
+      content: userMsg.content, attachments: [],
+    });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        const errMsg = data.error || `Ошибка ${resp.status}`;
+        toast.error(errMsg);
+        setMessages((m) => m.filter((x) => x.id !== "pending"));
+        setStreaming(false);
+        return;
+      }
+
+      const imageUrl = data.image_url as string;
+      const remaining = data.remaining ?? "?";
+      const content = `Готово! Осталось генераций сегодня: **${remaining}/${data.limit ?? 2}**`;
+
+      const attachments: Attachment[] = [{
+        name: `nexus-${Date.now()}.png`,
+        type: "image/png",
+        url: imageUrl,
+        data_url: imageUrl,
+      }];
+
+      const { data: saved } = await supabase.from("messages").insert({
+        conversation_id: convoId, user_id: userId, role: "assistant",
+        content, attachments: attachments as any,
+      }).select().single();
+
+      setMessages((m) =>
+        m.map((x) => x.id === "pending"
+          ? { id: saved?.id || crypto.randomUUID(), role: "assistant", content, attachments, pending: false }
+          : x)
+      );
+
+      await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", convoId);
+      toast.success(`Изображение готово! Осталось: ${remaining}`);
+    } catch (e: any) {
+      toast.error("Ошибка: " + e.message);
+      setMessages((m) => m.filter((x) => x.id !== "pending"));
+    } finally {
+      setStreaming(false);
+    }
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
