@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Plus, Trash2, LogOut, Paperclip, X, Loader2,
-  MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2, Wand2,
+  MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2, Wand2, Brain,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -31,7 +31,8 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const [toolsUsed, setToolsUsed] = useState(0);
+  const [toolsUsed, setToolsUsed] = useState<string[]>([]);
+  const [thinkMode, setThinkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 768 : true
   );
@@ -173,8 +174,13 @@ export default function Chat() {
     }
 
     setStreaming(true);
-    setToolsUsed(0);
-    const text = currentInput;
+    setToolsUsed([]);
+    let text = currentInput;
+    let useThink = thinkMode;
+    if (/^\/think\b/i.test(text)) {
+      useThink = true;
+      text = text.replace(/^\/think\b\s*/i, "");
+    }
     const files = pendingFiles;
     setInputValue("");
     setPendingFiles([]);
@@ -228,7 +234,7 @@ export default function Chat() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ messages: apiMessages, think: useThink }),
       });
 
       if (!resp.ok) {
@@ -262,7 +268,8 @@ export default function Chat() {
           if (payload === "[DONE]") { done = true; break; }
           try {
             const p = JSON.parse(payload);
-            if (p.meta?.tools_used) setToolsUsed(p.meta.tools_used);
+            if (p.meta?.tools) setToolsUsed(p.meta.tools);
+            if (p.error) toast.error(p.error);
             const delta = p.choices?.[0]?.delta?.content;
             if (delta) {
               accum += delta;
@@ -294,6 +301,7 @@ export default function Chat() {
       setMessages((m) => m.filter((x) => x.id !== "pending"));
     } finally {
       setStreaming(false);
+      setThinkMode(false);
     }
   };
 
@@ -538,7 +546,7 @@ export default function Chat() {
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} toolsUsed={m.pending ? toolsUsed : 0} />
+                <MessageBubble key={m.id} message={m} toolsUsed={m.pending ? toolsUsed : []} thinking={m.pending && thinkMode} />
               ))}
             </div>
           )}
@@ -584,6 +592,16 @@ export default function Chat() {
               >
                 <Wand2 className="w-4 h-4" />
               </Button>
+              <Button
+                variant={thinkMode ? "default" : "ghost"} size="sm"
+                onClick={() => setThinkMode((v) => !v)}
+                disabled={streaming}
+                aria-label="Режим глубокого размышления"
+                title="Глубокое размышление (точнее, медленнее)"
+                className={thinkMode ? "bg-primary/20 text-primary hover:bg-primary/30" : ""}
+              >
+                <Brain className="w-4 h-4" />
+              </Button>
 
               <Textarea
                 ref={textareaRef}
@@ -591,7 +609,7 @@ export default function Chat() {
                 onInput={autosize}
                 onKeyDown={onKeyDown}
                 onPaste={onPaste}
-                placeholder="Сообщение или /image <описание> для генерации картинки (2/день)"
+                placeholder={thinkMode ? "🧠 Глубокое размышление активно — задайте вопрос..." : "Сообщение, /image <описание> или /think <вопрос>"}
                 rows={1}
                 disabled={streaming}
                 className="flex-1 min-h-[40px] max-h-[200px] resize-none border-0 bg-transparent focus-visible:ring-0 px-2"
@@ -616,8 +634,12 @@ export default function Chat() {
   );
 }
 
-function MessageBubble({ message, toolsUsed }: { message: Message; toolsUsed: number }) {
+function MessageBubble({ message, toolsUsed, thinking }: { message: Message; toolsUsed: string[]; thinking?: boolean }) {
   const isUser = message.role === "user";
+  const toolIcon: Record<string, string> = {
+    web_search: "🔍", fetch_url: "🌐", github_search: "🐙",
+    wikipedia_lookup: "📚", fetch_docs: "📖",
+  };
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -651,10 +673,21 @@ function MessageBubble({ message, toolsUsed }: { message: Message; toolsUsed: nu
           </div>
         ) : (
           <div>
+            {toolsUsed.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {Array.from(new Set(toolsUsed)).map((t) => (
+                  <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    {toolIcon[t] || "🔧"} {t}
+                  </span>
+                ))}
+              </div>
+            )}
             {message.pending && message.content === "" && (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                {toolsUsed > 0 ? (
-                  <><Wrench className="w-3.5 h-3.5 animate-pulse" /> Использую инструменты ({toolsUsed})...</>
+                {thinking ? (
+                  <><Brain className="w-3.5 h-3.5 animate-pulse text-primary" /> Глубокое размышление...</>
+                ) : toolsUsed.length > 0 ? (
+                  <><Wrench className="w-3.5 h-3.5 animate-pulse" /> Использую инструменты...</>
                 ) : (
                   <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Думаю...</>
                 )}
