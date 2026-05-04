@@ -174,8 +174,13 @@ export default function Chat() {
     }
 
     setStreaming(true);
-    setToolsUsed(0);
-    const text = currentInput;
+    setToolsUsed([]);
+    let text = currentInput;
+    let useThink = thinkMode;
+    if (/^\/think\b/i.test(text)) {
+      useThink = true;
+      text = text.replace(/^\/think\b\s*/i, "");
+    }
     const files = pendingFiles;
     setInputValue("");
     setPendingFiles([]);
@@ -229,7 +234,7 @@ export default function Chat() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ messages: apiMessages, think: useThink }),
       });
 
       if (!resp.ok) {
