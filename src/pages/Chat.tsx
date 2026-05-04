@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Plus, Trash2, LogOut, Paperclip, X, Loader2,
-  MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2, Wand2,
+  MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2, Wand2, Brain,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -31,7 +31,8 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const [toolsUsed, setToolsUsed] = useState(0);
+  const [toolsUsed, setToolsUsed] = useState<string[]>([]);
+  const [thinkMode, setThinkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 768 : true
   );
