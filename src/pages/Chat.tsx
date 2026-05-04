@@ -268,7 +268,8 @@ export default function Chat() {
           if (payload === "[DONE]") { done = true; break; }
           try {
             const p = JSON.parse(payload);
-            if (p.meta?.tools_used) setToolsUsed(p.meta.tools_used);
+            if (p.meta?.tools) setToolsUsed(p.meta.tools);
+            if (p.error) toast.error(p.error);
             const delta = p.choices?.[0]?.delta?.content;
             if (delta) {
               accum += delta;
@@ -300,6 +301,7 @@ export default function Chat() {
       setMessages((m) => m.filter((x) => x.id !== "pending"));
     } finally {
       setStreaming(false);
+      setThinkMode(false);
     }
   };
 
