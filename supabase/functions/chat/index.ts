@@ -1,4 +1,5 @@
 // Nexus chat edge function — delegates to shared agent
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { runAgentStream } from '../_shared/nexus-agent.ts';
 
 const corsHeaders = {
@@ -17,7 +18,23 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    return await runAgentStream(messages, model, corsHeaders, { think: !!think });
+
+    // Extract userId from JWT (verify_jwt is false by default; we just decode for context)
+    let userId: string | null = null;
+    const auth = req.headers.get('Authorization') || '';
+    if (auth.startsWith('Bearer ')) {
+      try {
+        const supa = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')!,
+          { global: { headers: { Authorization: auth } } },
+        );
+        const { data } = await supa.auth.getUser();
+        userId = data?.user?.id || null;
+      } catch { /* ignore */ }
+    }
+
+    return await runAgentStream(messages, model, corsHeaders, { think: !!think, userId });
   } catch (e) {
     console.error('chat error:', e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown' }), {
