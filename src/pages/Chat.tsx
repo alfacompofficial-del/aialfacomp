@@ -296,11 +296,12 @@ export default function Chat() {
       // Save assistant message
       const { data: saved } = await supabase.from("messages").insert({
         conversation_id: convoId, user_id: userId, role: "assistant", content: accum,
+        attachments: genFiles as any,
       }).select().single();
 
       setMessages((m) =>
         m.map((x) => x.id === "pending"
-          ? { ...x, id: saved?.id || crypto.randomUUID(), pending: false, content: accum }
+          ? { ...x, id: saved?.id || crypto.randomUUID(), pending: false, content: accum, attachments: genFiles }
           : x)
       );
 
