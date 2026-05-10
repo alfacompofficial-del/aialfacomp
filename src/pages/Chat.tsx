@@ -648,7 +648,7 @@ function MessageBubble({ message, toolsUsed, thinking }: { message: Message; too
   const isUser = message.role === "user";
   const toolIcon: Record<string, string> = {
     web_search: "🔍", fetch_url: "🌐", github_search: "🐙",
-    wikipedia_lookup: "📚", fetch_docs: "📖",
+    wikipedia_lookup: "📚", fetch_docs: "📖", generate_file: "📄",
   };
   return (
     <motion.div
