@@ -669,9 +669,19 @@ function MessageBubble({ message, toolsUsed, thinking }: { message: Message; too
               a.type.startsWith("image/") ? (
                 <img key={i} src={a.url || a.data_url} alt={a.name} className="max-h-48 rounded-lg border border-border" />
               ) : (
-                <a key={i} href={a.url} target="_blank" rel="noreferrer"
-                   className="flex items-center gap-2 px-2 py-1 rounded-lg bg-secondary text-xs">
-                  <FileText className="w-3.5 h-3.5" />{a.name}
+                <a key={i} href={a.url} download={a.name} target="_blank" rel="noreferrer"
+                   className="inline-flex items-center gap-3 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/70 border border-border transition-colors max-w-sm group">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                       style={{ background: "var(--gradient-primary)" }}>
+                    <FileText className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="text-sm font-medium truncate">{a.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {a.size ? `${(a.size / 1024).toFixed(1)} KB · ` : ""}Скачать
+                    </div>
+                  </div>
+                  <Download className="w-4 h-4 text-muted-foreground group-hover:text-foreground shrink-0" />
                 </a>
               )
             ))}
