@@ -88,17 +88,64 @@ export const TOOLS = [
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';
 
-async function execTool(name: string, args: any): Promise<string> {
+interface ToolCtx {
+  userId?: string | null;
+  onFile?: (info: { name: string; url: string; size: number; mime: string }) => void;
+}
+
+async function execTool(name: string, args: any, ctx: ToolCtx = {}): Promise<string> {
   try {
     if (name === 'web_search') return await webSearch(args.query);
     if (name === 'fetch_url') return await fetchUrl(args.url);
     if (name === 'wikipedia_lookup') return await wikipediaLookup(args.query, args.lang || 'ru');
     if (name === 'github_search') return await githubSearch(args.query, args.language, args.kind || 'repos');
     if (name === 'fetch_docs') return await fetchDocs(args.library, args.topic);
+    if (name === 'generate_file') return await generateFileTool(args, ctx);
     return `Неизвестный инструмент: ${name}`;
   } catch (e) {
     return `Ошибка ${name}: ${e instanceof Error ? e.message : 'unknown'}`;
   }
+}
+
+async function generateFileTool(args: any, ctx: ToolCtx): Promise<string> {
+  if (!ctx.userId) return 'generate_file недоступен в этом контексте (нужен авторизованный пользователь).';
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!SUPABASE_URL || !SERVICE_KEY) return 'Storage не настроен.';
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  // Daily limit: 10 files / day
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count } = await admin.from('file_generations').select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId).gte('created_at', since);
+  if ((count ?? 0) >= 10) return 'Достигнут дневной лимит генерации файлов (10/день). Попробуйте завтра.';
+
+  let result;
+  try {
+    result = await generateFile(args.format, args.content || '', args.files);
+  } catch (e) {
+    return `Не удалось сгенерировать файл: ${e instanceof Error ? e.message : 'unknown'}`;
+  }
+
+  const safeName = (args.filename || 'file').toString().replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 60) || 'file';
+  const fullName = `${safeName}.${result.ext}`;
+  const path = `${ctx.userId}/${crypto.randomUUID()}-${fullName}`;
+
+  const { error: upErr } = await admin.storage.from('generated-files').upload(path, result.bytes, {
+    contentType: result.mime, upsert: false,
+  });
+  if (upErr) return `Ошибка загрузки: ${upErr.message}`;
+
+  const { data: pub } = admin.storage.from('generated-files').getPublicUrl(path);
+  const url = pub.publicUrl;
+
+  await admin.from('file_generations').insert({
+    user_id: ctx.userId, format: result.ext, filename: fullName,
+  });
+
+  ctx.onFile?.({ name: fullName, url, size: result.bytes.byteLength, mime: result.mime });
+
+  return `✅ Файл готов: ${fullName} (${(result.bytes.byteLength / 1024).toFixed(1)} KB). Ссылка отправлена пользователю в виде кнопки скачивания.`;
 }
 
 async function webSearch(query: string): Promise<string> {
