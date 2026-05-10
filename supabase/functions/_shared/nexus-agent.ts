@@ -1,4 +1,6 @@
 // Shared Nexus agent: streaming-first tool loop, real tools, /think mode
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { generateFile } from './file-generators.ts';
 export const GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
 const BASE_PROMPT = `Ты — Nexus, продвинутый ИИ-агент. Самостоятельная система: своя личность, свои инструменты, свой стиль.
