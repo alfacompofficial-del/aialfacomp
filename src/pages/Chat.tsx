@@ -250,6 +250,7 @@ export default function Chat() {
       const decoder = new TextDecoder();
       let buffer = "";
       let accum = "";
+      let genFiles: Attachment[] = [];
       let done = false;
 
       while (!done) {
@@ -269,6 +270,14 @@ export default function Chat() {
           try {
             const p = JSON.parse(payload);
             if (p.meta?.tools) setToolsUsed(p.meta.tools);
+            if (p.meta?.file) {
+              const f = p.meta.file;
+              const att: Attachment = { name: f.name, type: f.mime, url: f.url, size: f.size };
+              genFiles.push(att);
+              setMessages((m) => m.map((x) =>
+                x.id === "pending" ? { ...x, attachments: [...(x.attachments || []), att] } : x
+              ));
+            }
             if (p.error) toast.error(p.error);
             const delta = p.choices?.[0]?.delta?.content;
             if (delta) {
