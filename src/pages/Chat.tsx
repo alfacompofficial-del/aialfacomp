@@ -14,7 +14,7 @@ import {
 import { Link } from "react-router-dom";
 
 type Conversation = { id: string; title: string; updated_at: string };
-type Attachment = { name: string; type: string; url: string; data_url?: string };
+type Attachment = { name: string; type: string; url: string; data_url?: string; size?: number };
 type Message = {
   id: string;
   role: "user" | "assistant";
