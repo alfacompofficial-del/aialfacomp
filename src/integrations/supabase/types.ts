@@ -112,6 +112,30 @@ export type Database = {
         }
         Relationships: []
       }
+      file_generations: {
+        Row: {
+          created_at: string
+          filename: string
+          format: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filename: string
+          format: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filename?: string
+          format?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       image_generations: {
         Row: {
           created_at: string

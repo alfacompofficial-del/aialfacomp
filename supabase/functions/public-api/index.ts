@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     admin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRow.id).then();
 
     // 6) Run agent
-    return await runAgentStream(messages, model, corsHeaders);
+    return await runAgentStream(messages, model, corsHeaders, { userId: keyRow.user_id });
   } catch (e) {
     console.error('public-api error:', e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown' }), {
