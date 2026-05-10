@@ -352,7 +352,7 @@ export async function runAgentStream(
   userMessages: any[],
   model: string,
   corsHeaders: Record<string, string>,
-  opts: { think?: boolean } = {},
+  opts: { think?: boolean; userId?: string | null } = {},
 ): Promise<Response> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
@@ -367,6 +367,11 @@ export async function runAgentStream(
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
+      const onFile = (info: { name: string; url: string; size: number; mime: string }) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { file: info } })}\n\n`));
+      };
+      const ctx: ToolCtx = { userId: opts.userId, onFile };
+
       try {
         for (let i = 0; i < 6; i++) {
           const body: any = { model: useModel, messages: convo, tools: TOOLS };
@@ -385,17 +390,14 @@ export async function runAgentStream(
           }
 
           if (res.toolCalls.length === 0) {
-            // Done — content already streamed
             controller.enqueue(encoder.encode('data: [DONE]\n\n'));
             controller.close();
             return;
           }
 
-          // Notify client which tools are about to run
           for (const tc of res.toolCalls) toolsUsedNames.push(tc.name);
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { tools: toolsUsedNames } })}\n\n`));
 
-          // Execute tools
           convo.push({
             role: 'assistant',
             content: res.assistantContent || null,
@@ -408,7 +410,7 @@ export async function runAgentStream(
           for (const tc of res.toolCalls) {
             let args: any = {};
             try { args = JSON.parse(tc.args || '{}'); } catch {}
-            const result = await execTool(tc.name, args);
+            const result = await execTool(tc.name, args, ctx);
             convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, 8000) });
           }
         }
