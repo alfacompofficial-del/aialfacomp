@@ -70,6 +70,18 @@ export const TOOLS = [
       description: 'Документация популярного фреймворка/библиотеки.',
       parameters: { type: 'object', properties: { library: { type: 'string' }, topic: { type: 'string' } }, required: ['library', 'topic'] },
   }},
+  { type: 'function', function: {
+      name: 'generate_file',
+      description: 'Сгенерировать файл для скачивания пользователем (pdf, docx, txt, md, zip). Используй когда пользователь явно просит сделать файл/документ/отчёт/архив. Для zip передавай массив files. Контент в markdown (# заголовки, - списки).',
+      parameters: { type: 'object', properties: {
+        format: { type: 'string', enum: ['pdf', 'docx', 'txt', 'md', 'zip'] },
+        filename: { type: 'string', description: 'Имя файла без расширения, например "resume" или "report"' },
+        content: { type: 'string', description: 'Содержимое файла (markdown для pdf/docx/md, plain text для txt). Для zip — содержимое README.txt по умолчанию.' },
+        files: { type: 'array', description: 'Только для zip: список файлов внутри архива', items: { type: 'object', properties: {
+          name: { type: 'string' }, content: { type: 'string' },
+        }, required: ['name', 'content'] } },
+      }, required: ['format', 'filename'] },
+  }},
 ];
 
 // ───────────────────────── Tool implementations ─────────────────────────
