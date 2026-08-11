@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Plus, Trash2, LogOut, Paperclip, X, Loader2,
   MessageSquare, Image as ImageIcon, FileText, Wrench, Download, Code2, Wand2, Brain,
+  Settings as SettingsIcon, Globe,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -514,6 +515,16 @@ export default function Chat() {
             </ScrollArea>
 
             <div className="p-3 border-t border-sidebar-border space-y-1">
+              <Link to="/settings">
+                <Button variant="ghost" className="w-full justify-start gap-2" size="sm">
+                  <SettingsIcon className="w-4 h-4" /> Настройки общения
+                </Button>
+              </Link>
+              <Link to="/sites">
+                <Button variant="ghost" className="w-full justify-start gap-2" size="sm">
+                  <Globe className="w-4 h-4" /> Мои сайты
+                </Button>
+              </Link>
               <Link to="/download">
                 <Button variant="ghost" className="w-full justify-start gap-2" size="sm">
                   <Download className="w-4 h-4" /> Скачать приложение
@@ -647,7 +658,7 @@ export default function Chat() {
 function MessageBubble({ message, toolsUsed, thinking }: { message: Message; toolsUsed: string[]; thinking?: boolean }) {
   const isUser = message.role === "user";
   const toolIcon: Record<string, string> = {
-    web_search: "🔍", fetch_url: "🌐", github_search: "🐙",
+    web_search: "🔍", fetch_url: "🌐", github_search: "🐙", analyze_repo: "🔬",
     wikipedia_lookup: "📚", fetch_docs: "📖", generate_file: "📄",
   };
   return (
