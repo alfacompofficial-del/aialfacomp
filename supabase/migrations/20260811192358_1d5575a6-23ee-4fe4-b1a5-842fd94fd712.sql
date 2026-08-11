@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.enforce_site_limit() FROM PUBLIC, anon, authenticated;
