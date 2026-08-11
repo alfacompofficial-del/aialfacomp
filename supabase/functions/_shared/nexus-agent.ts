@@ -235,6 +235,97 @@ async function fetchUrl(url: string): Promise<string> {
   }
 }
 
+// ───────────────────────── GitHub deep repo analysis ─────────────────────────
+
+const SKIP_DIRS = /(^|\/)(node_modules|dist|build|out|\.git|\.next|vendor|coverage|__pycache__|\.venv|target|bin|obj|assets|public\/assets)(\/|$)/i;
+const SKIP_FILES = /(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb|poetry\.lock|Gemfile\.lock|\.min\.(js|css)$)/i;
+const TEXT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|sql|json|yml|yaml|toml|ini|env\.example|md|html|htm|css|scss|less|vue|svelte|astro|dart|lua|ex|exs|gradle|dockerfile|txt)$/i;
+const PRIORITY = /(readme|package\.json|requirements\.txt|pyproject\.toml|go\.mod|cargo\.toml|dockerfile|docker-compose|tsconfig|vite\.config|next\.config|main\.|index\.|app\.|server\.|__init__)/i;
+
+function ghHeaders(): Record<string, string> {
+  const h: Record<string, string> = { Accept: 'application/vnd.github+json', 'User-Agent': 'NexusBot' };
+  const token = Deno.env.get('GITHUB_TOKEN');
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+}
+
+function parseGitHubUrl(url: string): { owner: string; repo: string; ref?: string; subPath?: string } | null {
+  const m = url.match(/github(?:usercontent)?\.com\/([^/\s]+)\/([^/\s#?]+)(?:\/(?:tree|blob)\/([^/\s#?]+)(?:\/([^\s#?]*))?)?/i);
+  if (!m) return null;
+  return { owner: m[1], repo: m[2].replace(/\.git$/, ''), ref: m[3], subPath: m[4] };
+}
+
+async function analyzeRepo(url: string, focus?: string, maxFiles?: number): Promise<string> {
+  const parsed = parseGitHubUrl(url || '');
+  if (!parsed) return 'analyze_repo: не похоже на ссылку GitHub. Для обычных сайтов используй fetch_url.';
+  const { owner, repo } = parsed;
+  const limit = Math.min(Math.max(maxFiles || 30, 5), 40);
+
+  // Repo meta
+  const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders() });
+  if (metaRes.status === 404) return `analyze_repo: репозиторий ${owner}/${repo} не найден или приватный.`;
+  if (metaRes.status === 403) return 'analyze_repo: лимит GitHub API исчерпан. Попробуйте через несколько минут.';
+  if (!metaRes.ok) return `analyze_repo: GitHub вернул ${metaRes.status}`;
+  const meta = await metaRes.json();
+  const ref = parsed.ref || meta.default_branch || 'main';
+
+  // File tree
+  const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`, { headers: ghHeaders() });
+  if (!treeRes.ok) return `analyze_repo: не удалось получить дерево файлов (${treeRes.status}).`;
+  const tree = await treeRes.json();
+  const allFiles: { path: string; size: number }[] = (tree.tree || [])
+    .filter((n: any) => n.type === 'blob')
+    .map((n: any) => ({ path: n.path as string, size: n.size || 0 }));
+
+  const scopePath = (parsed.subPath || focus || '').replace(/^\/+|\/+$/g, '');
+  const inScope = scopePath && !/\s/.test(scopePath)
+    ? allFiles.filter((f) => f.path.startsWith(scopePath))
+    : allFiles;
+
+  const candidates = (inScope.length ? inScope : allFiles).filter(
+    (f) => !SKIP_DIRS.test(f.path) && !SKIP_FILES.test(f.path) && TEXT_EXT.test(f.path) && f.size <= 100_000,
+  );
+
+  candidates.sort((a, b) => {
+    const pa = PRIORITY.test(a.path) ? 0 : 1;
+    const pb = PRIORITY.test(b.path) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    const da = a.path.split('/').length, db = b.path.split('/').length;
+    if (da !== db) return da - db;
+    return b.size - a.size;
+  });
+
+  const picked = candidates.slice(0, limit);
+
+  const contents = await Promise.all(picked.map(async (f) => {
+    try {
+      const r = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${f.path.split('/').map(encodeURIComponent).join('/')}`, {
+        headers: { 'User-Agent': UA },
+      });
+      if (!r.ok) return `### ${f.path}\n(не удалось прочитать: HTTP ${r.status})`;
+      let text = await r.text();
+      const lines = text.split('\n');
+      const truncated = lines.length > 400;
+      if (truncated) text = lines.slice(0, 400).join('\n');
+      return `### ${f.path} (${(f.size / 1024).toFixed(1)} KB${truncated ? `, показаны первые 400 из ${lines.length} строк` : ''})\n\`\`\`\n${text.slice(0, 12000)}\n\`\`\``;
+    } catch (e) {
+      return `### ${f.path}\n(ошибка чтения: ${e instanceof Error ? e.message : 'unknown'})`;
+    }
+  }));
+
+  const treeList = allFiles.slice(0, 300).map((f) => `- ${f.path}`).join('\n');
+  const header = [
+    `РЕПОЗИТОРИЙ: ${meta.full_name}`,
+    `Описание: ${meta.description || '—'}`,
+    `Язык: ${meta.language || '—'} · ★${meta.stargazers_count ?? 0} · ветка: ${ref}`,
+    `Ссылка: ${meta.html_url}`,
+    `Всего файлов: ${allFiles.length}. Прочитано исходников: ${picked.length}${candidates.length > picked.length ? ` из ${candidates.length} подходящих (охвачена часть — сообщи об этом пользователю)` : ''}.`,
+  ].join('\n');
+
+  return `${header}\n\nСТРУКТУРА (до 300 путей):\n${treeList}${allFiles.length > 300 ? '\n... (список усечён)' : ''}\n\nСОДЕРЖИМОЕ ФАЙЛОВ:\n\n${contents.join('\n\n')}`;
+}
+
+
 async function wikipediaLookup(query: string, lang: string): Promise<string> {
   const r = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
   if (!r.ok) {
