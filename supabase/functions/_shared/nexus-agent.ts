@@ -101,11 +101,13 @@ async function execTool(name: string, args: any, ctx: ToolCtx = {}): Promise<str
   try {
     if (name === 'web_search') return await webSearch(args.query);
     if (name === 'fetch_url') return await fetchUrl(args.url);
+    if (name === 'analyze_repo') return await analyzeRepo(args.url, args.focus, args.max_files);
     if (name === 'wikipedia_lookup') return await wikipediaLookup(args.query, args.lang || 'ru');
     if (name === 'github_search') return await githubSearch(args.query, args.language, args.kind || 'repos');
     if (name === 'fetch_docs') return await fetchDocs(args.library, args.topic);
     if (name === 'generate_file') return await generateFileTool(args, ctx);
     return `Неизвестный инструмент: ${name}`;
+
   } catch (e) {
     return `Ошибка ${name}: ${e instanceof Error ? e.message : 'unknown'}`;
   }
