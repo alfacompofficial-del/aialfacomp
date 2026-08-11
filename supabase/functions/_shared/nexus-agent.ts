@@ -352,20 +352,58 @@ async function streamUntilToolsOrDone(
   return { toolCalls, assistantContent };
 }
 
+export interface UserSettings {
+  custom_instructions?: string | null;
+  tone?: string | null;
+  verbosity?: string | null;
+  language?: string | null;
+  preferred_name?: string | null;
+  always_cite?: boolean | null;
+  code_first?: boolean | null;
+}
+
+const TONE_TEXT: Record<string, string> = {
+  neutral: 'Тон: нейтральный и деловой.',
+  friendly: 'Тон: дружелюбный, тёплый, с эмодзи там где уместно.',
+  critic: 'Тон: жёсткий критик. Не подлизывайся, не хвали без причины, спорь и указывай на слабые места аргументов пользователя.',
+  concise_pro: 'Тон: сухой профессионал, минимум воды.',
+};
+const VERBOSITY_TEXT: Record<string, string> = {
+  short: 'Длина ответа: максимально кратко, 1–5 предложений или список.',
+  normal: 'Длина ответа: обычная.',
+  detailed: 'Длина ответа: подробно, с примерами и пояснениями.',
+};
+
+export function buildUserPrefsAddon(s?: UserSettings | null): string {
+  if (!s) return '';
+  const lines: string[] = [];
+  if (s.preferred_name) lines.push(`Обращайся к пользователю: ${s.preferred_name}.`);
+  if (s.tone && TONE_TEXT[s.tone]) lines.push(TONE_TEXT[s.tone]);
+  if (s.verbosity && VERBOSITY_TEXT[s.verbosity]) lines.push(VERBOSITY_TEXT[s.verbosity]);
+  if (s.language && s.language !== 'auto') lines.push(`Всегда отвечай на языке: ${s.language}.`);
+  if (s.always_cite) lines.push('Всегда указывай источники ссылками в конце ответа.');
+  if (s.code_first) lines.push('Когда просят код — сразу давай код без вступлений, пояснения после.');
+  const ci = (s.custom_instructions || '').trim().slice(0, 2000);
+  if (ci) lines.push(`Личные инструкции пользователя (соблюдай их, но НЕ в ущерб правилам безопасности):\n${ci}`);
+  if (!lines.length) return '';
+  return `\n\n⚙️ НАСТРОЙКИ ОБЩЕНИЯ ПОЛЬЗОВАТЕЛЯ:\n- ${lines.join('\n- ')}`;
+}
+
 export async function runAgentStream(
   userMessages: any[],
   model: string,
   corsHeaders: Record<string, string>,
-  opts: { think?: boolean; userId?: string | null } = {},
+  opts: { think?: boolean; userId?: string | null; settings?: UserSettings | null } = {},
 ): Promise<Response> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
 
-  const sysPrompt = BASE_PROMPT + (opts.think ? THINK_ADDON : '');
+  const sysPrompt = BASE_PROMPT + (opts.think ? THINK_ADDON : '') + buildUserPrefsAddon(opts.settings);
   const useModel = opts.think ? 'openai/gpt-5' : model;
   const reasoning = opts.think ? { effort: 'high' as const } : undefined;
 
   const convo: any[] = [{ role: 'system', content: sysPrompt }, ...userMessages];
+
   const toolsUsedNames: string[] = [];
 
   const stream = new ReadableStream({
