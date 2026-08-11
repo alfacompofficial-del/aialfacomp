@@ -56,6 +56,16 @@ export const TOOLS = [
       parameters: { type: 'object', properties: { url: { type: 'string', description: 'Полный URL начиная с https://' } }, required: ['url'] },
   }},
   { type: 'function', function: {
+      name: 'analyze_repo',
+      description: 'Глубокий анализ GitHub-репозитория: получает дерево файлов и читает содержимое исходников (до 40 файлов). Используй когда пользователь дал ссылку на github.com и просит проанализировать проект / найти ошибки / объяснить структуру.',
+      parameters: { type: 'object', properties: {
+        url: { type: 'string', description: 'Ссылка на репозиторий, папку, файл или ветку github.com' },
+        focus: { type: 'string', description: 'Опционально: подпапка или тема (например "src/api" или "авторизация")' },
+        max_files: { type: 'number', description: 'Сколько файлов читать (по умолчанию 30, максимум 40)' },
+      }, required: ['url'] },
+  }},
+
+  { type: 'function', function: {
       name: 'wikipedia_lookup',
       description: 'Поиск в Wikipedia (биографии, исторические факты, определения).',
       parameters: { type: 'object', properties: { query: { type: 'string' }, lang: { type: 'string', enum: ['ru', 'en'] } }, required: ['query'] },
