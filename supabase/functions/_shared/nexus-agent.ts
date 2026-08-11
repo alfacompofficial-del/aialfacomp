@@ -19,12 +19,16 @@ const BASE_PROMPT = `Ты — Nexus, продвинутый ИИ-агент. С�
 ИНСТРУМЕНТЫ — используй активно когда нужны актуальные данные:
 - web_search — поиск в интернете (новости, факты, текущие события)
 - fetch_url — открыть и прочитать конкретную веб-страницу
+- analyze_repo — ГЛУБОКИЙ АНАЛИЗ GitHub-репозитория: читает дерево файлов и содержимое кода. Используй ВСЕГДА когда пользователь даёт ссылку на github.com и просит проанализировать проект, найти ошибки, объяснить структуру.
 - github_search — поиск репозиториев и кода на GitHub
 - wikipedia_lookup — энциклопедические факты
 - fetch_docs — документация фреймворков (react, nextjs, tailwind, vue, ...)
 - generate_file — СГЕНЕРИРОВАТЬ ФАЙЛ для скачивания: pdf, docx, txt, md, zip. Используй когда пользователь просит "сделай pdf/документ/отчёт/архив/скачать файл". Контент пиши в markdown (заголовки #, ##, списки -). Для .exe — генерируй zip с .py или .bat скриптом + README с инструкцией по сборке через pyinstaller (Windows .exe в браузере не собрать).
 
+ПУБЛИКАЦИЯ САЙТОВ: если пользователь просит "сделай ссылку на проект" / "опубликуй сайт" — скажи, что нужно нажать кнопку «Создать ссылку» над блоком кода HTML, ввести имя проекта, и сайт будет доступен по адресу /site/{имя}.
+
 ВАЖНО: если пользователь спрашивает про сайт, ссылку, репозиторий или актуальные данные — СНАЧАЛА вызови инструмент, потом отвечай. Никогда не выдумывай ссылки.
+
 
 ФОРМАТИРОВАНИЕ:
 - Код всегда в markdown-блоках с языком: \`\`\`ts, \`\`\`python и т.д.
@@ -51,6 +55,16 @@ export const TOOLS = [
       description: 'Открыть конкретную веб-страницу и прочитать её содержимое. Используй когда есть URL или после web_search чтобы изучить источник детально.',
       parameters: { type: 'object', properties: { url: { type: 'string', description: 'Полный URL начиная с https://' } }, required: ['url'] },
   }},
+  { type: 'function', function: {
+      name: 'analyze_repo',
+      description: 'Глубокий анализ GitHub-репозитория: получает дерево файлов и читает содержимое исходников (до 40 файлов). Используй когда пользователь дал ссылку на github.com и просит проанализировать проект / найти ошибки / объяснить структуру.',
+      parameters: { type: 'object', properties: {
+        url: { type: 'string', description: 'Ссылка на репозиторий, папку, файл или ветку github.com' },
+        focus: { type: 'string', description: 'Опционально: подпапка или тема (например "src/api" или "авторизация")' },
+        max_files: { type: 'number', description: 'Сколько файлов читать (по умолчанию 30, максимум 40)' },
+      }, required: ['url'] },
+  }},
+
   { type: 'function', function: {
       name: 'wikipedia_lookup',
       description: 'Поиск в Wikipedia (биографии, исторические факты, определения).',
@@ -97,11 +111,13 @@ async function execTool(name: string, args: any, ctx: ToolCtx = {}): Promise<str
   try {
     if (name === 'web_search') return await webSearch(args.query);
     if (name === 'fetch_url') return await fetchUrl(args.url);
+    if (name === 'analyze_repo') return await analyzeRepo(args.url, args.focus, args.max_files);
     if (name === 'wikipedia_lookup') return await wikipediaLookup(args.query, args.lang || 'ru');
     if (name === 'github_search') return await githubSearch(args.query, args.language, args.kind || 'repos');
     if (name === 'fetch_docs') return await fetchDocs(args.library, args.topic);
     if (name === 'generate_file') return await generateFileTool(args, ctx);
     return `Неизвестный инструмент: ${name}`;
+
   } catch (e) {
     return `Ошибка ${name}: ${e instanceof Error ? e.message : 'unknown'}`;
   }
@@ -218,6 +234,97 @@ async function fetchUrl(url: string): Promise<string> {
     return `fetch_url ошибка: ${e instanceof Error ? e.message : 'unknown'}`;
   }
 }
+
+// ───────────────────────── GitHub deep repo analysis ─────────────────────────
+
+const SKIP_DIRS = /(^|\/)(node_modules|dist|build|out|\.git|\.next|vendor|coverage|__pycache__|\.venv|target|bin|obj|assets|public\/assets)(\/|$)/i;
+const SKIP_FILES = /(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb|poetry\.lock|Gemfile\.lock|\.min\.(js|css)$)/i;
+const TEXT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|sql|json|yml|yaml|toml|ini|env\.example|md|html|htm|css|scss|less|vue|svelte|astro|dart|lua|ex|exs|gradle|dockerfile|txt)$/i;
+const PRIORITY = /(readme|package\.json|requirements\.txt|pyproject\.toml|go\.mod|cargo\.toml|dockerfile|docker-compose|tsconfig|vite\.config|next\.config|main\.|index\.|app\.|server\.|__init__)/i;
+
+function ghHeaders(): Record<string, string> {
+  const h: Record<string, string> = { Accept: 'application/vnd.github+json', 'User-Agent': 'NexusBot' };
+  const token = Deno.env.get('GITHUB_TOKEN');
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+}
+
+function parseGitHubUrl(url: string): { owner: string; repo: string; ref?: string; subPath?: string } | null {
+  const m = url.match(/github(?:usercontent)?\.com\/([^/\s]+)\/([^/\s#?]+)(?:\/(?:tree|blob)\/([^/\s#?]+)(?:\/([^\s#?]*))?)?/i);
+  if (!m) return null;
+  return { owner: m[1], repo: m[2].replace(/\.git$/, ''), ref: m[3], subPath: m[4] };
+}
+
+async function analyzeRepo(url: string, focus?: string, maxFiles?: number): Promise<string> {
+  const parsed = parseGitHubUrl(url || '');
+  if (!parsed) return 'analyze_repo: не похоже на ссылку GitHub. Для обычных сайтов используй fetch_url.';
+  const { owner, repo } = parsed;
+  const limit = Math.min(Math.max(maxFiles || 30, 5), 40);
+
+  // Repo meta
+  const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders() });
+  if (metaRes.status === 404) return `analyze_repo: репозиторий ${owner}/${repo} не найден или приватный.`;
+  if (metaRes.status === 403) return 'analyze_repo: лимит GitHub API исчерпан. Попробуйте через несколько минут.';
+  if (!metaRes.ok) return `analyze_repo: GitHub вернул ${metaRes.status}`;
+  const meta = await metaRes.json();
+  const ref = parsed.ref || meta.default_branch || 'main';
+
+  // File tree
+  const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`, { headers: ghHeaders() });
+  if (!treeRes.ok) return `analyze_repo: не удалось получить дерево файлов (${treeRes.status}).`;
+  const tree = await treeRes.json();
+  const allFiles: { path: string; size: number }[] = (tree.tree || [])
+    .filter((n: any) => n.type === 'blob')
+    .map((n: any) => ({ path: n.path as string, size: n.size || 0 }));
+
+  const scopePath = (parsed.subPath || focus || '').replace(/^\/+|\/+$/g, '');
+  const inScope = scopePath && !/\s/.test(scopePath)
+    ? allFiles.filter((f) => f.path.startsWith(scopePath))
+    : allFiles;
+
+  const candidates = (inScope.length ? inScope : allFiles).filter(
+    (f) => !SKIP_DIRS.test(f.path) && !SKIP_FILES.test(f.path) && TEXT_EXT.test(f.path) && f.size <= 100_000,
+  );
+
+  candidates.sort((a, b) => {
+    const pa = PRIORITY.test(a.path) ? 0 : 1;
+    const pb = PRIORITY.test(b.path) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    const da = a.path.split('/').length, db = b.path.split('/').length;
+    if (da !== db) return da - db;
+    return b.size - a.size;
+  });
+
+  const picked = candidates.slice(0, limit);
+
+  const contents = await Promise.all(picked.map(async (f) => {
+    try {
+      const r = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${f.path.split('/').map(encodeURIComponent).join('/')}`, {
+        headers: { 'User-Agent': UA },
+      });
+      if (!r.ok) return `### ${f.path}\n(не удалось прочитать: HTTP ${r.status})`;
+      let text = await r.text();
+      const lines = text.split('\n');
+      const truncated = lines.length > 400;
+      if (truncated) text = lines.slice(0, 400).join('\n');
+      return `### ${f.path} (${(f.size / 1024).toFixed(1)} KB${truncated ? `, показаны первые 400 из ${lines.length} строк` : ''})\n\`\`\`\n${text.slice(0, 12000)}\n\`\`\``;
+    } catch (e) {
+      return `### ${f.path}\n(ошибка чтения: ${e instanceof Error ? e.message : 'unknown'})`;
+    }
+  }));
+
+  const treeList = allFiles.slice(0, 300).map((f) => `- ${f.path}`).join('\n');
+  const header = [
+    `РЕПОЗИТОРИЙ: ${meta.full_name}`,
+    `Описание: ${meta.description || '—'}`,
+    `Язык: ${meta.language || '—'} · ★${meta.stargazers_count ?? 0} · ветка: ${ref}`,
+    `Ссылка: ${meta.html_url}`,
+    `Всего файлов: ${allFiles.length}. Прочитано исходников: ${picked.length}${candidates.length > picked.length ? ` из ${candidates.length} подходящих (охвачена часть — сообщи об этом пользователю)` : ''}.`,
+  ].join('\n');
+
+  return `${header}\n\nСТРУКТУРА (до 300 путей):\n${treeList}${allFiles.length > 300 ? '\n... (список усечён)' : ''}\n\nСОДЕРЖИМОЕ ФАЙЛОВ:\n\n${contents.join('\n\n')}`;
+}
+
 
 async function wikipediaLookup(query: string, lang: string): Promise<string> {
   const r = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
@@ -348,20 +455,58 @@ async function streamUntilToolsOrDone(
   return { toolCalls, assistantContent };
 }
 
+export interface UserSettings {
+  custom_instructions?: string | null;
+  tone?: string | null;
+  verbosity?: string | null;
+  language?: string | null;
+  preferred_name?: string | null;
+  always_cite?: boolean | null;
+  code_first?: boolean | null;
+}
+
+const TONE_TEXT: Record<string, string> = {
+  neutral: 'Тон: нейтральный и деловой.',
+  friendly: 'Тон: дружелюбный, тёплый, с эмодзи там где уместно.',
+  critic: 'Тон: жёсткий критик. Не подлизывайся, не хвали без причины, спорь и указывай на слабые места аргументов пользователя.',
+  concise_pro: 'Тон: сухой профессионал, минимум воды.',
+};
+const VERBOSITY_TEXT: Record<string, string> = {
+  short: 'Длина ответа: максимально кратко, 1–5 предложений или список.',
+  normal: 'Длина ответа: обычная.',
+  detailed: 'Длина ответа: подробно, с примерами и пояснениями.',
+};
+
+export function buildUserPrefsAddon(s?: UserSettings | null): string {
+  if (!s) return '';
+  const lines: string[] = [];
+  if (s.preferred_name) lines.push(`Обращайся к пользователю: ${s.preferred_name}.`);
+  if (s.tone && TONE_TEXT[s.tone]) lines.push(TONE_TEXT[s.tone]);
+  if (s.verbosity && VERBOSITY_TEXT[s.verbosity]) lines.push(VERBOSITY_TEXT[s.verbosity]);
+  if (s.language && s.language !== 'auto') lines.push(`Всегда отвечай на языке: ${s.language}.`);
+  if (s.always_cite) lines.push('Всегда указывай источники ссылками в конце ответа.');
+  if (s.code_first) lines.push('Когда просят код — сразу давай код без вступлений, пояснения после.');
+  const ci = (s.custom_instructions || '').trim().slice(0, 2000);
+  if (ci) lines.push(`Личные инструкции пользователя (соблюдай их, но НЕ в ущерб правилам безопасности):\n${ci}`);
+  if (!lines.length) return '';
+  return `\n\n⚙️ НАСТРОЙКИ ОБЩЕНИЯ ПОЛЬЗОВАТЕЛЯ:\n- ${lines.join('\n- ')}`;
+}
+
 export async function runAgentStream(
   userMessages: any[],
   model: string,
   corsHeaders: Record<string, string>,
-  opts: { think?: boolean; userId?: string | null } = {},
+  opts: { think?: boolean; userId?: string | null; settings?: UserSettings | null } = {},
 ): Promise<Response> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
 
-  const sysPrompt = BASE_PROMPT + (opts.think ? THINK_ADDON : '');
+  const sysPrompt = BASE_PROMPT + (opts.think ? THINK_ADDON : '') + buildUserPrefsAddon(opts.settings);
   const useModel = opts.think ? 'openai/gpt-5' : model;
   const reasoning = opts.think ? { effort: 'high' as const } : undefined;
 
   const convo: any[] = [{ role: 'system', content: sysPrompt }, ...userMessages];
+
   const toolsUsedNames: string[] = [];
 
   const stream = new ReadableStream({

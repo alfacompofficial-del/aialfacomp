@@ -222,6 +222,84 @@ export type Database = {
         }
         Relationships: []
       }
+      published_sites: {
+        Row: {
+          created_at: string
+          css: string
+          html: string
+          id: string
+          js: string
+          slug: string
+          title: string
+          updated_at: string
+          user_id: string
+          views: number
+        }
+        Insert: {
+          created_at?: string
+          css?: string
+          html?: string
+          id?: string
+          js?: string
+          slug: string
+          title?: string
+          updated_at?: string
+          user_id: string
+          views?: number
+        }
+        Update: {
+          created_at?: string
+          css?: string
+          html?: string
+          id?: string
+          js?: string
+          slug?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          views?: number
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          always_cite: boolean
+          code_first: boolean
+          created_at: string
+          custom_instructions: string
+          language: string
+          preferred_name: string | null
+          tone: string
+          updated_at: string
+          user_id: string
+          verbosity: string
+        }
+        Insert: {
+          always_cite?: boolean
+          code_first?: boolean
+          created_at?: string
+          custom_instructions?: string
+          language?: string
+          preferred_name?: string | null
+          tone?: string
+          updated_at?: string
+          user_id: string
+          verbosity?: string
+        }
+        Update: {
+          always_cite?: boolean
+          code_first?: boolean
+          created_at?: string
+          custom_instructions?: string
+          language?: string
+          preferred_name?: string | null
+          tone?: string
+          updated_at?: string
+          user_id?: string
+          verbosity?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

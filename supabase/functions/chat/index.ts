@@ -21,6 +21,7 @@ Deno.serve(async (req) => {
 
     // Extract userId from JWT (verify_jwt is false by default; we just decode for context)
     let userId: string | null = null;
+    let settings: any = null;
     const auth = req.headers.get('Authorization') || '';
     if (auth.startsWith('Bearer ')) {
       try {
@@ -31,10 +32,15 @@ Deno.serve(async (req) => {
         );
         const { data } = await supa.auth.getUser();
         userId = data?.user?.id || null;
+        if (userId) {
+          const { data: s } = await supa.from('user_settings').select('*').eq('user_id', userId).maybeSingle();
+          settings = s || null;
+        }
       } catch { /* ignore */ }
     }
 
-    return await runAgentStream(messages, model, corsHeaders, { think: !!think, userId });
+    return await runAgentStream(messages, model, corsHeaders, { think: !!think, userId, settings });
+
   } catch (e) {
     console.error('chat error:', e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown' }), {
