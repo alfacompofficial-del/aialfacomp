@@ -176,6 +176,8 @@ export default function Chat() {
 
     setStreaming(true);
     setToolsUsed([]);
+    setThinkingText("");
+
     let text = currentInput;
     let useThink = thinkMode;
     if (/^\/think\b/i.test(text)) {
