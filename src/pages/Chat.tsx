@@ -722,7 +722,7 @@ function MessageBubble({ message, toolsUsed, thinking, thinkingText }: { message
             {message.pending && message.content === "" && (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 {thinking ? (
-                  <><Brain className="w-3.5 h-3.5 animate-pulse text-primary" /> Глубокое размышление...</>
+                  <><Brain className="w-3.5 h-3.5 animate-pulse text-primary" /> Глубоко думаю над ответом (это может занять до минуты)...</>
                 ) : toolsUsed.length > 0 ? (
                   <><Wrench className="w-3.5 h-3.5 animate-pulse" /> Использую инструменты...</>
                 ) : (
@@ -730,7 +730,18 @@ function MessageBubble({ message, toolsUsed, thinking, thinkingText }: { message
                 )}
               </div>
             )}
+            {message.pending && !!thinkingText && (
+              <details open className="mt-2 mb-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
+                <summary className="cursor-pointer text-xs text-primary flex items-center gap-1.5">
+                  <Brain className="w-3.5 h-3.5" /> Размышления
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  {thinkingText}
+                </p>
+              </details>
+            )}
             {message.content && <Markdown content={message.content} />}
+
           </div>
         )}
       </div>
