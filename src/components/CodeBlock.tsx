@@ -208,14 +208,25 @@ export function CodeBlock({ language, code }: Props) {
       </AnimatePresence>
 
       {!previewing && (
-        <SyntaxHighlighter
-          language={lang || "text"}
-          style={oneDark as any}
-          customStyle={{ margin: 0, padding: "16px", background: "transparent", fontSize: 13 }}
-          wrapLongLines
-        >
-          {code.replace(/\n$/, "")}
-        </SyntaxHighlighter>
+        <div className="overflow-x-auto">
+          <SyntaxHighlighter
+            language={lang || "text"}
+            style={oneDark as any}
+            customStyle={{
+              margin: 0,
+              padding: "16px",
+              background: "transparent",
+              fontSize: 13,
+              lineHeight: 1.6,
+            }}
+            codeTagProps={{ style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } }}
+            showLineNumbers={code.split("\n").length > 1}
+            lineNumberStyle={{ minWidth: 32, paddingRight: 12, opacity: 0.35, userSelect: "none" }}
+            wrapLongLines={wrap}
+          >
+            {code.replace(/\n$/, "")}
+          </SyntaxHighlighter>
+        </div>
       )}
     </div>
   );
