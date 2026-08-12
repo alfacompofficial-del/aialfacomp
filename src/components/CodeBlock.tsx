@@ -40,7 +40,9 @@ function buildPreviewDoc(lang: string, code: string): string {
 
 export function CodeBlock({ language, code }: Props) {
   const [copied, setCopied] = useState(false);
+  const [wrap, setWrap] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+
   const [publishOpen, setPublishOpen] = useState(false);
   const [slug, setSlug] = useState("");
   const [slugError, setSlugError] = useState<string | null>(null);
