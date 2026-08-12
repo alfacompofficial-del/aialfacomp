@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Copy, Check, Play, X, Globe, Loader2, ExternalLink } from "lucide-react";
+import { Copy, Check, Play, X, Globe, Loader2, ExternalLink, WrapText } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { motion, AnimatePresence } from "framer-motion";
