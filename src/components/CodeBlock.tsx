@@ -122,8 +122,9 @@ export function CodeBlock({ language, code }: Props) {
               {wrap ? "Без переноса" : "Перенос"}
             </Button>
           )}
-
+          {isPreviewable && (
             <Button
+
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-xs"
