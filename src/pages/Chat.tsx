@@ -661,7 +661,7 @@ export default function Chat() {
   );
 }
 
-function MessageBubble({ message, toolsUsed, thinking }: { message: Message; toolsUsed: string[]; thinking?: boolean }) {
+function MessageBubble({ message, toolsUsed, thinking, thinkingText }: { message: Message; toolsUsed: string[]; thinking?: boolean; thinkingText?: string }) {
   const isUser = message.role === "user";
   const toolIcon: Record<string, string> = {
     web_search: "🔍", fetch_url: "🌐", github_search: "🐙", analyze_repo: "🔬",
