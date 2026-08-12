@@ -34,6 +34,8 @@ export default function Chat() {
   const [streaming, setStreaming] = useState(false);
   const [toolsUsed, setToolsUsed] = useState<string[]>([]);
   const [thinkMode, setThinkMode] = useState(false);
+  const [thinkingText, setThinkingText] = useState("");
+
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 768 : true
   );
