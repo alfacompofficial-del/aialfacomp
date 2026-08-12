@@ -276,8 +276,9 @@ export default function Chat() {
             const p = JSON.parse(payload);
             if (p.meta?.tools) setToolsUsed(p.meta.tools);
             if (p.meta?.thinking) setThinkingText((t) => (t + p.meta.thinking).slice(-4000));
-
+            if (p.meta?.file) {
               const f = p.meta.file;
+
               const att: Attachment = { name: f.name, type: f.mime, url: f.url, size: f.size };
               genFiles.push(att);
               setMessages((m) => m.map((x) =>
