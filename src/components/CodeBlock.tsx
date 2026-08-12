@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Copy, Check, Play, X, Globe, Loader2, ExternalLink } from "lucide-react";
+import { Copy, Check, Play, X, Globe, Loader2, ExternalLink, WrapText } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,7 +40,9 @@ function buildPreviewDoc(lang: string, code: string): string {
 
 export function CodeBlock({ language, code }: Props) {
   const [copied, setCopied] = useState(false);
+  const [wrap, setWrap] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+
   const [publishOpen, setPublishOpen] = useState(false);
   const [slug, setSlug] = useState("");
   const [slugError, setSlugError] = useState<string | null>(null);
@@ -110,10 +112,19 @@ export function CodeBlock({ language, code }: Props) {
   return (
     <div className="my-3 rounded-xl border border-border overflow-hidden bg-card">
       <div className="flex items-center justify-between px-4 py-2 bg-secondary/60 border-b border-border">
-        <span className="text-xs font-mono text-muted-foreground">{lang || "text"}</span>
+        <span className="text-xs font-mono text-muted-foreground">
+          {lang || "text"} · {code.trim().split("\n").length} стр.
+        </span>
         <div className="flex items-center gap-1">
+          {!previewing && code.split("\n").length > 1 && (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setWrap((v) => !v)}>
+              <WrapText className="w-3.5 h-3.5 mr-1" />
+              {wrap ? "Без переноса" : "Перенос"}
+            </Button>
+          )}
           {isPreviewable && (
             <Button
+
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-xs"
@@ -208,14 +219,25 @@ export function CodeBlock({ language, code }: Props) {
       </AnimatePresence>
 
       {!previewing && (
-        <SyntaxHighlighter
-          language={lang || "text"}
-          style={oneDark as any}
-          customStyle={{ margin: 0, padding: "16px", background: "transparent", fontSize: 13 }}
-          wrapLongLines
-        >
-          {code.replace(/\n$/, "")}
-        </SyntaxHighlighter>
+        <div className="overflow-x-auto">
+          <SyntaxHighlighter
+            language={lang || "text"}
+            style={oneDark as any}
+            customStyle={{
+              margin: 0,
+              padding: "16px",
+              background: "transparent",
+              fontSize: 13,
+              lineHeight: 1.6,
+            }}
+            codeTagProps={{ style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } }}
+            showLineNumbers={code.split("\n").length > 1}
+            lineNumberStyle={{ minWidth: 32, paddingRight: 12, opacity: 0.35, userSelect: "none" }}
+            wrapLongLines={wrap}
+          >
+            {code.replace(/\n$/, "")}
+          </SyntaxHighlighter>
+        </div>
       )}
     </div>
   );

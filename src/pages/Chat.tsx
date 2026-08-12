@@ -34,6 +34,8 @@ export default function Chat() {
   const [streaming, setStreaming] = useState(false);
   const [toolsUsed, setToolsUsed] = useState<string[]>([]);
   const [thinkMode, setThinkMode] = useState(false);
+  const [thinkingText, setThinkingText] = useState("");
+
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 768 : true
   );
@@ -176,6 +178,8 @@ export default function Chat() {
 
     setStreaming(true);
     setToolsUsed([]);
+    setThinkingText("");
+
     let text = currentInput;
     let useThink = thinkMode;
     if (/^\/think\b/i.test(text)) {
@@ -271,8 +275,10 @@ export default function Chat() {
           try {
             const p = JSON.parse(payload);
             if (p.meta?.tools) setToolsUsed(p.meta.tools);
+            if (p.meta?.thinking) setThinkingText((t) => (t + p.meta.thinking).slice(-4000));
             if (p.meta?.file) {
               const f = p.meta.file;
+
               const att: Attachment = { name: f.name, type: f.mime, url: f.url, size: f.size };
               genFiles.push(att);
               setMessages((m) => m.map((x) =>
@@ -567,7 +573,7 @@ export default function Chat() {
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} toolsUsed={m.pending ? toolsUsed : []} thinking={m.pending && thinkMode} />
+                <MessageBubble key={m.id} message={m} toolsUsed={m.pending ? toolsUsed : []} thinking={m.pending && thinkMode} thinkingText={m.pending ? thinkingText : ""} />
               ))}
             </div>
           )}
@@ -655,7 +661,7 @@ export default function Chat() {
   );
 }
 
-function MessageBubble({ message, toolsUsed, thinking }: { message: Message; toolsUsed: string[]; thinking?: boolean }) {
+function MessageBubble({ message, toolsUsed, thinking, thinkingText }: { message: Message; toolsUsed: string[]; thinking?: boolean; thinkingText?: string }) {
   const isUser = message.role === "user";
   const toolIcon: Record<string, string> = {
     web_search: "🔍", fetch_url: "🌐", github_search: "🐙", analyze_repo: "🔬",
@@ -716,7 +722,7 @@ function MessageBubble({ message, toolsUsed, thinking }: { message: Message; too
             {message.pending && message.content === "" && (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 {thinking ? (
-                  <><Brain className="w-3.5 h-3.5 animate-pulse text-primary" /> Глубокое размышление...</>
+                  <><Brain className="w-3.5 h-3.5 animate-pulse text-primary" /> Глубоко думаю над ответом (это может занять до минуты)...</>
                 ) : toolsUsed.length > 0 ? (
                   <><Wrench className="w-3.5 h-3.5 animate-pulse" /> Использую инструменты...</>
                 ) : (
@@ -724,7 +730,18 @@ function MessageBubble({ message, toolsUsed, thinking }: { message: Message; too
                 )}
               </div>
             )}
+            {message.pending && !!thinkingText && (
+              <details open className="mt-2 mb-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
+                <summary className="cursor-pointer text-xs text-primary flex items-center gap-1.5">
+                  <Brain className="w-3.5 h-3.5" /> Размышления
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  {thinkingText}
+                </p>
+              </details>
+            )}
             {message.content && <Markdown content={message.content} />}
+
           </div>
         )}
       </div>

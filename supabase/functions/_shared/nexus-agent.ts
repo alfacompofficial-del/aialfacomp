@@ -38,11 +38,18 @@ const BASE_PROMPT = `Ты — Nexus, продвинутый ИИ-агент. С�
 const THINK_ADDON = `
 
 🧠 РЕЖИМ ГЛУБОКОГО РАЗМЫШЛЕНИЯ АКТИВЕН:
-- Сначала разложи задачу на шаги внутри себя
-- Проверь факты через web_search / fetch_url / github_search
+- Думай долго и тщательно: разложи задачу на шаги, рассмотри альтернативы, проверь себя
+- Проверяй факты через web_search / fetch_url / github_search / analyze_repo
 - Только потом дай точный, обоснованный ответ
 - Обязательно укажи источники в конце
-- Качество важнее скорости`;
+- Качество важнее скорости — не спеши
+
+КОД В ЭТОМ РЕЖИМЕ:
+- Пиши полный, рабочий, production-ready код без заглушек и "// ..."
+- Обязательно указывай язык в блоке кода и имя файла комментарием в первой строке
+- Продумай обработку ошибок, edge-cases, типы
+- После кода — краткое пояснение ключевых решений`;
+
 
 export const TOOLS = [
   { type: 'function', function: {
@@ -492,6 +499,152 @@ export function buildUserPrefsAddon(s?: UserSettings | null): string {
   return `\n\n⚙️ НАСТРОЙКИ ОБЩЕНИЯ ПОЛЬЗОВАТЕЛЯ:\n- ${lines.join('\n- ')}`;
 }
 
+// ===================== THINK MODE (Responses API, real reasoning) =====================
+const RESPONSES_URL = 'https://ai.gateway.lovable.dev/v1/responses';
+const THINK_MODEL = 'openai/gpt-5.6-sol';
+
+function toResponsesInput(messages: any[]): any[] {
+  const items: any[] = [];
+  for (const m of messages) {
+    const role = m.role === 'assistant' ? 'assistant' : 'user';
+    const textType = role === 'assistant' ? 'output_text' : 'input_text';
+    if (typeof m.content === 'string') {
+      items.push({ role, content: [{ type: textType, text: m.content }] });
+      continue;
+    }
+    if (Array.isArray(m.content)) {
+      const parts: any[] = [];
+      for (const c of m.content) {
+        if (c?.type === 'text' && c.text) parts.push({ type: textType, text: c.text });
+        else if (c?.type === 'image_url' && c.image_url?.url && role === 'user') {
+          parts.push({ type: 'input_image', image_url: c.image_url.url });
+        }
+      }
+      if (parts.length) items.push({ role, content: parts });
+    }
+  }
+  return items;
+}
+
+const RESPONSES_TOOLS = TOOLS.map((t: any) => ({
+  type: 'function',
+  name: t.function.name,
+  description: t.function.description,
+  parameters: t.function.parameters,
+  strict: false,
+}));
+
+async function runThinkStream(
+  userMessages: any[],
+  sysPrompt: string,
+  apiKey: string,
+  corsHeaders: Record<string, string>,
+  ctxOpts: { userId?: string | null },
+): Promise<Response> {
+  const input = toResponsesInput(userMessages);
+  const toolsUsedNames: string[] = [];
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const send = (obj: any) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      const onFile = (info: { name: string; url: string; size: number; mime: string }) => send({ meta: { file: info } });
+      const ctx: ToolCtx = { userId: ctxOpts.userId, onFile };
+
+      try {
+        for (let iter = 0; iter < 6; iter++) {
+          const resp = await fetch(RESPONSES_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Lovable-API-Key': apiKey,
+              'X-Lovable-AIG-SDK': 'fetch',
+            },
+            body: JSON.stringify({
+              model: THINK_MODEL,
+              instructions: sysPrompt,
+              input,
+              tools: RESPONSES_TOOLS,
+              stream: true,
+              store: false,
+              reasoning: { effort: 'high', summary: 'detailed' },
+              include: ['reasoning.encrypted_content'],
+            }),
+          });
+
+          if (!resp.ok || !resp.body) {
+            const msg = resp.status === 429 ? 'Слишком много запросов. Подождите минуту.'
+              : resp.status === 402 ? 'Закончились кредиты Lovable AI.'
+              : 'Ошибка AI шлюза (think)';
+            send({ error: msg });
+            break;
+          }
+
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = '';
+          const funcCalls: { call_id: string; name: string; args: string }[] = [];
+          let sawText = false;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            let nl: number;
+            while ((nl = buf.indexOf('\n')) !== -1) {
+              let line = buf.slice(0, nl);
+              buf = buf.slice(nl + 1);
+              if (line.endsWith('\r')) line = line.slice(0, -1);
+              if (!line.startsWith('data: ')) continue;
+              const payload = line.slice(6).trim();
+              if (!payload || payload === '[DONE]') continue;
+              let ev: any;
+              try { ev = JSON.parse(payload); } catch { buf = line + '\n' + buf; break; }
+
+              if (ev.type === 'response.reasoning_summary_text.delta' && ev.delta) {
+                send({ meta: { thinking: ev.delta } });
+              } else if (ev.type === 'response.output_text.delta' && ev.delta) {
+                sawText = true;
+                send({ choices: [{ delta: { content: ev.delta } }] });
+              } else if (ev.type === 'response.output_item.done' && ev.item) {
+                const item = ev.item;
+                input.push(item);
+                if (item.type === 'function_call') {
+                  funcCalls.push({ call_id: item.call_id, name: item.name, args: item.arguments || '{}' });
+                }
+              } else if (ev.type === 'error' || ev.type === 'response.failed') {
+                send({ error: ev.error?.message || 'Ошибка думающей модели' });
+              }
+            }
+          }
+
+          if (funcCalls.length === 0) {
+            if (!sawText) send({ choices: [{ delta: { content: '\n\n_(модель не вернула текст, попробуйте переформулировать)_' } }] });
+            break;
+          }
+
+          for (const fc of funcCalls) toolsUsedNames.push(fc.name);
+          send({ meta: { tools: toolsUsedNames } });
+
+          for (const fc of funcCalls) {
+            let args: any = {};
+            try { args = JSON.parse(fc.args || '{}'); } catch { /* ignore */ }
+            const result = await execTool(fc.name, args, ctx);
+            input.push({ type: 'function_call_output', call_id: fc.call_id, output: result.slice(0, 8000) });
+          }
+        }
+      } catch (e) {
+        console.error('think stream error', e);
+        send({ error: e instanceof Error ? e.message : 'Unknown' });
+      }
+      controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, { headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' } });
+}
+
 export async function runAgentStream(
   userMessages: any[],
   model: string,
@@ -502,12 +655,18 @@ export async function runAgentStream(
   if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
 
   const sysPrompt = BASE_PROMPT + (opts.think ? THINK_ADDON : '') + buildUserPrefsAddon(opts.settings);
-  const useModel = opts.think ? 'openai/gpt-5' : model;
-  const reasoning = opts.think ? { effort: 'high' as const } : undefined;
+
+  if (opts.think) {
+    return await runThinkStream(userMessages, sysPrompt, LOVABLE_API_KEY, corsHeaders, { userId: opts.userId });
+  }
+
+  const useModel = model;
+  const reasoning = undefined as undefined | { effort: 'high' };
 
   const convo: any[] = [{ role: 'system', content: sysPrompt }, ...userMessages];
 
   const toolsUsedNames: string[] = [];
+
 
   const stream = new ReadableStream({
     async start(controller) {
