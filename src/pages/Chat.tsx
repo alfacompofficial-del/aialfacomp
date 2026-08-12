@@ -573,7 +573,7 @@ export default function Chat() {
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} toolsUsed={m.pending ? toolsUsed : []} thinking={m.pending && thinkMode} />
+                <MessageBubble key={m.id} message={m} toolsUsed={m.pending ? toolsUsed : []} thinking={m.pending && thinkMode} thinkingText={m.pending ? thinkingText : ""} />
               ))}
             </div>
           )}
