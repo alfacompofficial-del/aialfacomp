@@ -112,9 +112,17 @@ export function CodeBlock({ language, code }: Props) {
   return (
     <div className="my-3 rounded-xl border border-border overflow-hidden bg-card">
       <div className="flex items-center justify-between px-4 py-2 bg-secondary/60 border-b border-border">
-        <span className="text-xs font-mono text-muted-foreground">{lang || "text"}</span>
+        <span className="text-xs font-mono text-muted-foreground">
+          {lang || "text"} · {code.trim().split("\n").length} стр.
+        </span>
         <div className="flex items-center gap-1">
-          {isPreviewable && (
+          {!previewing && code.split("\n").length > 1 && (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setWrap((v) => !v)}>
+              <WrapText className="w-3.5 h-3.5 mr-1" />
+              {wrap ? "Без переноса" : "Перенос"}
+            </Button>
+          )}
+
             <Button
               variant="ghost"
               size="sm"
