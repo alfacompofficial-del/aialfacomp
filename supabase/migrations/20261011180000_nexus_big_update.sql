@@ -23,8 +23,20 @@ BEGIN
     SELECT 1 FROM pg_policies WHERE tablename = 'user_integrations' AND policyname = 'integrations_select_own'
   ) THEN
     CREATE POLICY "integrations_select_own" ON public.user_integrations FOR SELECT TO authenticated USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'user_integrations' AND policyname = 'integrations_insert_own'
+  ) THEN
     CREATE POLICY "integrations_insert_own" ON public.user_integrations FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'user_integrations' AND policyname = 'integrations_update_own'
+  ) THEN
     CREATE POLICY "integrations_update_own" ON public.user_integrations FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'user_integrations' AND policyname = 'integrations_delete_own'
+  ) THEN
     CREATE POLICY "integrations_delete_own" ON public.user_integrations FOR DELETE TO authenticated USING (auth.uid() = user_id);
   END IF;
 END $$;
@@ -35,12 +47,15 @@ FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- 3. Repo cache (1 hour TTL cache for GitHub repo tree/analysis)
 CREATE TABLE IF NOT EXISTS public.repo_cache (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  cache_key TEXT UNIQUE NOT NULL,
+  cache_key TEXT PRIMARY KEY,
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '1 hour')
 );
+
+-- Crucial: if repo_cache already existed without expires_at, add it:
+ALTER TABLE public.repo_cache 
+ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '1 hour');
 
 ALTER TABLE public.repo_cache ENABLE ROW LEVEL SECURITY;
 
@@ -50,6 +65,10 @@ BEGIN
     SELECT 1 FROM pg_policies WHERE tablename = 'repo_cache' AND policyname = 'repo_cache_select'
   ) THEN
     CREATE POLICY "repo_cache_select" ON public.repo_cache FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'repo_cache' AND policyname = 'repo_cache_all_service'
+  ) THEN
     CREATE POLICY "repo_cache_all_service" ON public.repo_cache FOR ALL TO service_role USING (true);
   END IF;
 END $$;
@@ -79,8 +98,20 @@ BEGIN
     SELECT 1 FROM pg_policies WHERE tablename = 'message_versions' AND policyname = 'versions_select_own'
   ) THEN
     CREATE POLICY "versions_select_own" ON public.message_versions FOR SELECT TO authenticated USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'message_versions' AND policyname = 'versions_insert_own'
+  ) THEN
     CREATE POLICY "versions_insert_own" ON public.message_versions FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'message_versions' AND policyname = 'versions_update_own'
+  ) THEN
     CREATE POLICY "versions_update_own" ON public.message_versions FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'message_versions' AND policyname = 'versions_delete_own'
+  ) THEN
     CREATE POLICY "versions_delete_own" ON public.message_versions FOR DELETE TO authenticated USING (auth.uid() = user_id);
   END IF;
 END $$;
