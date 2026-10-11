@@ -167,6 +167,7 @@ export type Database = {
           role: string
           tool_calls: Json | null
           user_id: string
+          versions: Json
         }
         Insert: {
           attachments?: Json
@@ -177,6 +178,7 @@ export type Database = {
           role: string
           tool_calls?: Json | null
           user_id: string
+          versions?: Json
         }
         Update: {
           attachments?: Json
@@ -187,6 +189,7 @@ export type Database = {
           role?: string
           tool_calls?: Json | null
           user_id?: string
+          versions?: Json
         }
         Relationships: [
           {
@@ -261,6 +264,48 @@ export type Database = {
         }
         Relationships: []
       }
+      repo_cache: {
+        Row: {
+          cache_key: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          cache_key: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          cache_key?: string
+          content?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      user_integrations: {
+        Row: {
+          github_token: string | null
+          supabase_access_token: string | null
+          supabase_project_ref: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          github_token?: string | null
+          supabase_access_token?: string | null
+          supabase_project_ref?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          github_token?: string | null
+          supabase_access_token?: string | null
+          supabase_project_ref?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           always_cite: boolean
@@ -269,6 +314,7 @@ export type Database = {
           custom_instructions: string
           language: string
           preferred_name: string | null
+          think_minutes: number
           tone: string
           updated_at: string
           user_id: string
@@ -281,6 +327,7 @@ export type Database = {
           custom_instructions?: string
           language?: string
           preferred_name?: string | null
+          think_minutes?: number
           tone?: string
           updated_at?: string
           user_id: string
@@ -293,6 +340,7 @@ export type Database = {
           custom_instructions?: string
           language?: string
           preferred_name?: string | null
+          think_minutes?: number
           tone?: string
           updated_at?: string
           user_id?: string
