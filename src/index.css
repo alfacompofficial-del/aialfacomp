@@ -2,9 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* highlight.js theme for code blocks */
-@import 'highlight.js/styles/github-dark.css';
-
 @layer base {
   :root {
     /* Midnight Indigo theme — dark by default */
@@ -100,3 +97,23 @@
 .nx-prose table { @apply w-full border-collapse my-3; }
 .nx-prose th, .nx-prose td { @apply border border-border px-3 py-1.5 text-sm; }
 .nx-prose blockquote { @apply border-l-2 border-primary pl-3 italic text-muted-foreground my-2; }
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Typing cursor animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-cursor::after {
+  content: '▋';
+  margin-left: 2px;
+  color: hsl(var(--primary));
+  animation: blink 1s infinite;
+  display: inline-block;
+  vertical-align: baseline;
+}

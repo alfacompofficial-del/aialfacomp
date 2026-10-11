@@ -264,21 +264,78 @@ export type Database = {
         }
         Relationships: []
       }
+      message_versions: {
+        Row: {
+          assistant_content: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          message_id: string
+          user_attachments: Json
+          user_content: string
+          user_id: string
+          version_index: number
+        }
+        Insert: {
+          assistant_content?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          message_id: string
+          user_attachments?: Json
+          user_content: string
+          user_id: string
+          version_index: number
+        }
+        Update: {
+          assistant_content?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string
+          user_attachments?: Json
+          user_content?: string
+          user_id?: string
+          version_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_versions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_versions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       repo_cache: {
         Row: {
           cache_key: string
           content: string
           created_at: string
+          expires_at: string
+          id: string
         }
         Insert: {
           cache_key: string
           content: string
           created_at?: string
+          expires_at: string
+          id?: string
         }
         Update: {
           cache_key?: string
           content?: string
           created_at?: string
+          expires_at?: string
+          id?: string
         }
         Relationships: []
       }

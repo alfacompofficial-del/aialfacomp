@@ -30,6 +30,13 @@ const BASE_PROMPT = `Ты — Nexus, продвинутый ИИ-агент. С�
 ВАЖНО: если пользователь спрашивает про сайт, ссылку, репозиторий или актуальные данные — СНАЧАЛА вызови инструмент, потом отвечай. Никогда не выдумывай ссылки.
 
 
+РАСПОЗНАВАНИЕ ИЗОБРАЖЕНИЙ И ОШИБОК (OCR):
+- При наличии изображения с кодом, ошибкой, консольным выводом или текстом — обязательно распознай текст и выведи его первым делом в специальном блоке:
+\`\`\`ocr
+[распознанный текст ошибки / лога / кода]
+\`\`\`
+- Сразу после блока \`\`\`ocr подробно объясни причину проблемы и предложи готовое исправление.
+
 ФОРМАТИРОВАНИЕ:
 - Код всегда в markdown-блоках с языком: \`\`\`ts, \`\`\`python и т.д.
 - Заголовки, списки, таблицы для структуры
@@ -267,6 +274,29 @@ async function analyzeRepo(url: string, focus?: string, maxFiles?: number): Prom
   if (!parsed) return 'analyze_repo: не похоже на ссылку GitHub. Для обычных сайтов используй fetch_url.';
   const { owner, repo } = parsed;
   const limit = Math.min(Math.max(maxFiles || 30, 5), 40);
+  const scopePath = (parsed.subPath || focus || '').replace(/^\/+|\/+$/g, '');
+
+  // 1-hour cache check via Supabase repo_cache
+  const cacheKey = `${owner}/${repo}:${parsed.ref || 'default'}:${scopePath || 'all'}:${limit}`.toLowerCase();
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  let adminClient: any = null;
+  if (supabaseUrl && serviceKey) {
+    try {
+      adminClient = createClient(supabaseUrl, serviceKey);
+      const { data: cached } = await adminClient
+        .from('repo_cache')
+        .select('content, expires_at')
+        .eq('cache_key', cacheKey)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+      if (cached?.content) {
+        return `[Кэш репозитория (TTL 1ч)]\n` + cached.content;
+      }
+    } catch (e) {
+      console.warn('repo_cache check error:', e);
+    }
+  }
 
   // Repo meta
   const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders() });
@@ -284,7 +314,6 @@ async function analyzeRepo(url: string, focus?: string, maxFiles?: number): Prom
     .filter((n: any) => n.type === 'blob')
     .map((n: any) => ({ path: n.path as string, size: n.size || 0 }));
 
-  const scopePath = (parsed.subPath || focus || '').replace(/^\/+|\/+$/g, '');
   const inScope = scopePath && !/\s/.test(scopePath)
     ? allFiles.filter((f) => f.path.startsWith(scopePath))
     : allFiles;
@@ -329,7 +358,22 @@ async function analyzeRepo(url: string, focus?: string, maxFiles?: number): Prom
     `Всего файлов: ${allFiles.length}. Прочитано исходников: ${picked.length}${candidates.length > picked.length ? ` из ${candidates.length} подходящих (охвачена часть — сообщи об этом пользователю)` : ''}.`,
   ].join('\n');
 
-  return `${header}\n\nСТРУКТУРА (до 300 путей):\n${treeList}${allFiles.length > 300 ? '\n... (список усечён)' : ''}\n\nСОДЕРЖИМОЕ ФАЙЛОВ:\n\n${contents.join('\n\n')}`;
+  const result = `${header}\n\nСТРУКТУРА (до 300 путей):\n${treeList}${allFiles.length > 300 ? '\n... (список усечён)' : ''}\n\nСОДЕРЖИМОЕ ФАЙЛОВ:\n\n${contents.join('\n\n')}`;
+
+  // Save to repo_cache with 1 hour expiration
+  if (adminClient) {
+    try {
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      await adminClient.from('repo_cache').upsert(
+        { cache_key: cacheKey, content: result, expires_at: expiresAt },
+        { onConflict: 'cache_key' }
+      );
+    } catch (e) {
+      console.warn('repo_cache save error:', e);
+    }
+  }
+
+  return result;
 }
 
 
@@ -470,6 +514,7 @@ export interface UserSettings {
   preferred_name?: string | null;
   always_cite?: boolean | null;
   code_first?: boolean | null;
+  think_minutes?: number | null;
 }
 
 const TONE_TEXT: Record<string, string> = {
@@ -493,6 +538,7 @@ export function buildUserPrefsAddon(s?: UserSettings | null): string {
   if (s.language && s.language !== 'auto') lines.push(`Всегда отвечай на языке: ${s.language}.`);
   if (s.always_cite) lines.push('Всегда указывай источники ссылками в конце ответа.');
   if (s.code_first) lines.push('Когда просят код — сразу давай код без вступлений, пояснения после.');
+  if (s.think_minutes) lines.push(`В режиме глубокого размышления ориентируйся на лимит времени обдумывания: ${s.think_minutes} минут.`);
   const ci = (s.custom_instructions || '').trim().slice(0, 2000);
   if (ci) lines.push(`Личные инструкции пользователя (соблюдай их, но НЕ в ущерб правилам безопасности):\n${ci}`);
   if (!lines.length) return '';
